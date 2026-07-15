@@ -183,9 +183,7 @@ def render_flamegraph(
     con.print(Panel(header, border_style="bright_cyan", padding=(0, 2)))
 
     if not trace.children:
-        con.print(
-            "  [dim]No tool calls recorded.[/dim]\n"
-        )
+        con.print("  [dim]No tool calls recorded.[/dim]\n")
         return
 
     # -- Flamegraph bars -------------------------------------------------
@@ -194,7 +192,7 @@ def render_flamegraph(
 
     # Root bar.
     root_bar = Text("█" * 60, style="bright_cyan")
-    con.print(f"  ", end="")
+    con.print("  ", end="")
     con.print(root_bar)
     con.print(
         f"  [bright_white]{trace.name}[/bright_white]"

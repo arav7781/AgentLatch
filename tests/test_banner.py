@@ -1,12 +1,28 @@
-"""Tests for agentlatch.banner — startup animation."""
+"""Tests for agentlatch.banner — startup animation with block-letter art."""
 
 from __future__ import annotations
 
+import re
 from io import StringIO
 
 from rich.console import Console
 
 from agentlatch.banner import initialize_latch, reset_banner
+
+# Regex to strip ANSI escape codes from Rich output.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+def _capture_banner() -> str:
+    """Render the banner into a string buffer and return plain text."""
+    buf = StringIO()
+    console = Console(file=buf, force_terminal=True, width=80)
+    initialize_latch(console=console)
+    return _strip_ansi(buf.getvalue())
 
 
 class TestBanner:
@@ -18,56 +34,55 @@ class TestBanner:
 
     def test_runs_without_crash(self):
         """initialize_latch() must complete without exception."""
-        buf = StringIO()
-        console = Console(file=buf, force_terminal=False, width=80)
-        # force_terminal=False → triggers the fallback path (non-TTY).
-        initialize_latch(console=console)
-
-        output = buf.getvalue()
-        assert "AGENTLATCH" in output
+        output = _capture_banner()
+        assert len(output) > 0
 
     def test_only_fires_once(self):
         """Calling initialize_latch twice should produce output only once."""
         buf = StringIO()
-        console = Console(file=buf, force_terminal=False, width=80)
+        console = Console(file=buf, force_terminal=True, width=80)
         initialize_latch(console=console)
-        first_output = buf.getvalue()
+        first_len = len(buf.getvalue())
 
-        # Reset the buffer but NOT the banner flag.
         buf.truncate(0)
         buf.seek(0)
         initialize_latch(console=console)
-        second_output = buf.getvalue()
+        second_len = len(buf.getvalue())
 
-        assert len(first_output) > 0
-        assert len(second_output) == 0  # no-op on second call
+        assert first_len > 0
+        assert second_len == 0
 
-    def test_fallback_contains_subtitle(self):
-        """Non-TTY fallback should include the middleware tagline."""
-        buf = StringIO()
-        console = Console(file=buf, force_terminal=False, width=80)
-        initialize_latch(console=console)
+    def test_contains_block_art(self):
+        """Output should contain block-letter ASCII art (██ blocks)."""
+        output = _capture_banner()
+        assert "██" in output
 
-        output = buf.getvalue()
+    def test_contains_welcome_text(self):
+        """Output should include the welcome tagline."""
+        output = _capture_banner()
         assert "resilience middleware" in output
 
-    def test_fallback_contains_version(self):
-        """Non-TTY fallback should include the version number."""
-        buf = StringIO()
-        console = Console(file=buf, force_terminal=False, width=80)
-        initialize_latch(console=console)
-
-        output = buf.getvalue()
+    def test_contains_version(self):
+        """Output should include the version number."""
+        output = _capture_banner()
         assert "v0.1.0" in output
 
-    def test_interactive_animation_no_crash(self):
-        """The full animation path (force_terminal=True) completes cleanly."""
-        buf = StringIO()
-        # force_terminal=True simulates a TTY for the Rich Console,
-        # but _is_interactive() checks sys.stdout.isatty() which will be
-        # False in test. So we test the fallback path here.
-        # The animation code is exercised via the vanilla_agent.py demo.
-        console = Console(file=buf, force_terminal=True, width=80)
-        initialize_latch(console=console)
-        output = buf.getvalue()
-        assert "AGENTLATCH" in output
+    def test_contains_lightning_bolt(self):
+        """The ⚡ divider between AGENT and LATCH must appear."""
+        output = _capture_banner()
+        assert "⚡" in output
+
+    def test_contains_dot_borders(self):
+        """Output must include the dotted border lines."""
+        output = _capture_banner()
+        assert "....." in output
+
+    def test_contains_stars(self):
+        """Output must include atmospheric star characters."""
+        output = _capture_banner()
+        assert "*" in output
+
+    def test_contains_ready_message(self):
+        """Output must include the 'Let's get started' message."""
+        output = _capture_banner()
+        assert "get started" in output

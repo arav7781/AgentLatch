@@ -8,7 +8,6 @@ import time
 
 import pytest
 
-from agentlatch._types import EventStatus
 from agentlatch.banner import reset_banner
 from agentlatch.decorators import profile_agent, safe_tool
 from agentlatch.tracker import get_trace, reset_context
@@ -27,6 +26,7 @@ def _clean_state():
 # ===================================================================
 # @safe_tool — sync
 # ===================================================================
+
 
 class TestSafeToolSync:
     def test_success_returns_normally(self):
@@ -94,6 +94,7 @@ class TestSafeToolSync:
 # @safe_tool — async
 # ===================================================================
 
+
 class TestSafeToolAsync:
     @pytest.mark.asyncio
     async def test_async_success(self):
@@ -127,6 +128,7 @@ class TestSafeToolAsync:
 # ===================================================================
 # @profile_agent
 # ===================================================================
+
 
 class TestProfileAgent:
     def test_records_trace(self):

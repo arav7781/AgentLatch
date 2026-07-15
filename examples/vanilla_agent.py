@@ -17,7 +17,6 @@ import time
 
 from agentlatch import profile_agent, safe_tool
 
-
 # ---------------------------------------------------------------------------
 # Tools — decorated with @safe_tool for resilience + timing
 # ---------------------------------------------------------------------------

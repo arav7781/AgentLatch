@@ -31,6 +31,7 @@ def _clean_context():
 # TraceEvent basics
 # -------------------------------------------------------------------
 
+
 class TestTraceEvent:
     def test_duration_while_in_progress(self):
         ev = TraceEvent(name="wip", start_time=time.monotonic())
@@ -45,6 +46,7 @@ class TestTraceEvent:
 # -------------------------------------------------------------------
 # init_trace
 # -------------------------------------------------------------------
+
 
 class TestInitTrace:
     def test_creates_root_event(self):
@@ -64,6 +66,7 @@ class TestInitTrace:
 # start_child / end_child
 # -------------------------------------------------------------------
 
+
 class TestChildEvents:
     def test_appends_to_parent(self):
         root = init_trace("agent")
@@ -75,7 +78,7 @@ class TestChildEvents:
         assert child.depth == 1
 
     def test_nested_children(self):
-        root = init_trace("agent")
+        init_trace("agent")
         child = start_child("tool_a")
         grandchild = start_child("sub_call")
 
@@ -114,6 +117,7 @@ class TestChildEvents:
 # finalize_trace
 # -------------------------------------------------------------------
 
+
 class TestFinalizeTrace:
     def test_stamps_end_time(self):
         root = init_trace("agent")
@@ -137,6 +141,7 @@ class TestFinalizeTrace:
 # -------------------------------------------------------------------
 # Context isolation across threads
 # -------------------------------------------------------------------
+
 
 class TestContextIsolation:
     def test_threads_do_not_share_context(self):

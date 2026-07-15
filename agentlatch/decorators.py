@@ -11,8 +11,8 @@ import concurrent.futures
 import functools
 import inspect
 import json
-import time
-from typing import Any, Callable, TypeVar, overload
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
 
 from agentlatch._types import ErrorPayload, EventStatus
 from agentlatch.tracker import (
@@ -91,6 +91,7 @@ def safe_tool(
 
     def decorator(fn: F) -> F:
         if inspect.iscoroutinefunction(fn):
+
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 # If no active trace, still protect — just skip timing.
@@ -122,6 +123,7 @@ def safe_tool(
             return async_wrapper  # type: ignore[return-value]
 
         else:
+
             @functools.wraps(fn)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 trace_active = get_trace() is not None
@@ -182,6 +184,7 @@ def profile_agent(
         label = name or fn.__name__
 
         if inspect.iscoroutinefunction(fn):
+
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 # Import here to avoid circular imports at module level.
@@ -201,6 +204,7 @@ def profile_agent(
 
             return async_wrapper  # type: ignore[return-value]
         else:
+
             @functools.wraps(fn)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 from agentlatch.banner import initialize_latch

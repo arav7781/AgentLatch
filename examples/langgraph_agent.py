@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 
 from agentlatch import profile_agent, safe_tool
 
-
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------

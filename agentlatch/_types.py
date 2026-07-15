@@ -9,6 +9,7 @@ from typing import Any, TypeAlias
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class EventStatus(enum.Enum):
     """Status of a traced execution event."""
 

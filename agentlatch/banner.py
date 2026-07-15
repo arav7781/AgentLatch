@@ -1,9 +1,9 @@
 """Startup banner animation — Claude Code-style cosmic reveal.
 
-Displays a large ASCII art banner with atmospheric cloud formations and
-scattered stars. The art progressively "decrypts" from block/hash noise
-into the final scene via a diagonal sweep, followed by a typing effect
-for the welcome message.
+Displays a large ASCII art banner spelling AGENT / LATCH in bold block
+letters, surrounded by cosmic cloud formations and scattered stars.
+The entire scene progressively "decrypts" from noise into the final art
+via a diagonal sweep, followed by a typing effect for the welcome message.
 
 Gracefully degrades in non-TTY environments (CI, Docker, piped output).
 """
@@ -20,26 +20,68 @@ from rich.live import Live
 from rich.text import Text
 
 # ---------------------------------------------------------------------------
-# Banner Art — Claude Code inspired cosmic atmosphere
+# Block Letter Definitions  (each char is exactly 6 columns wide)
 # ---------------------------------------------------------------------------
 
-_ART_LINES: list[str] = [
+_LETTER_DATA: dict[str, list[str]] = {
+    "A": [" ████ ", "██  ██", "██████", "██  ██", "██  ██"],
+    "G": [" █████", "██    ", "██ ███", "██  ██", " █████"],
+    "E": ["██████", "██    ", "████  ", "██    ", "██████"],
+    "N": ["██  ██", "███ ██", "██████", "██ ███", "██  ██"],
+    "T": ["██████", "  ██  ", "  ██  ", "  ██  ", "  ██  "],
+    "L": ["██    ", "██    ", "██    ", "██    ", "██████"],
+    "C": [" █████", "██    ", "██    ", "██    ", " █████"],
+    "H": ["██  ██", "██  ██", "██████", "██  ██", "██  ██"],
+}
+
+
+def _build_word_lines(word: str, indent: int = 4, gap: int = 2) -> list[str]:
+    """Render a word as 5 lines of block-letter ASCII art."""
+    pad = " " * indent
+    sep = " " * gap
+    return [pad + sep.join(_LETTER_DATA[ch][row] for ch in word) for row in range(5)]
+
+
+# ---------------------------------------------------------------------------
+# Build the Full Art Scene
+# ---------------------------------------------------------------------------
+
+_ATMOS_TOP: list[str] = [
     "...............................................................",
     "",
-    "     *                                       █████▓▓░          ",
-    "                                 *         ███▓░     ░░        ",
-    "            ░░░░░░                        ███▓░                ",
-    "    ░░░   ░░░░░░░░░░                      ███▓░                ",
-    "   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓       ",
-    "                                             ░▓▓███▓▓░        ",
-    " *                                 ░░░░                       ",
-    "                                 ░░░░░░░░                     ",
-    "                               ░░░░░░░░░░░░░░░░               ",
-    "                                                      *       ",
-    "      ⚡ A G E N T L A T C H                *                 ",
-    "                      *                                       ",
+    "  *        ░░░░░░                              █████▓▓░       ",
+    "         ░░░░░░░░░░              *           ███▓░   ░░       ",
+    "       ░░░░░░░░░░░░░░░░                      ███▓░            ",
+    "    *                        *                 ██▓░░    ▓     ",
+    "                                                ░▓▓██▓▓░     ",
+    "",
+]
+
+_AGENT_LINES: list[str] = _build_word_lines("AGENT")
+_DIVIDER: list[str] = ["                       ⚡"]
+_LATCH_LINES: list[str] = _build_word_lines("LATCH")
+
+_ATMOS_BOTTOM: list[str] = [
+    "",
+    " *                       ░░░░                          *      ",
+    "                       ░░░░░░░░                               ",
+    "                     ░░░░░░░░░░░░░░                           ",
+    "                                                *             ",
     "...............................................................",
 ]
+
+_ART_LINES: list[str] = (
+    _ATMOS_TOP + _AGENT_LINES + _DIVIDER + _LATCH_LINES + _ATMOS_BOTTOM
+)
+
+# Pre-compute which rows are ASCII-art text (not atmosphere).
+_TEXT_ROW_START = len(_ATMOS_TOP)
+_TEXT_ROW_END = _TEXT_ROW_START + len(_AGENT_LINES) + len(_DIVIDER) + len(_LATCH_LINES)
+_TEXT_ROWS: set[int] = set(range(_TEXT_ROW_START, _TEXT_ROW_END))
+
+# ---------------------------------------------------------------------------
+# Welcome / Tagline
+# ---------------------------------------------------------------------------
 
 _WELCOME_LINE = "  Terminal-native agent resilience middleware  v0.1.0"
 _READY_LINE = "  Let's get started."
@@ -49,12 +91,25 @@ _READY_LINE = "  Let's get started."
 # ---------------------------------------------------------------------------
 
 _NOISE_CHARS: list[str] = [
-    "█", "▓", "▒", "░", "#", "@", "%", "&", "╬", "╠", "╣", "╋", "┃", "┫",
+    "█",
+    "▓",
+    "▒",
+    "░",
+    "#",
+    "@",
+    "%",
+    "&",
+    "╬",
+    "╠",
+    "╣",
+    "╋",
+    "┃",
+    "┫",
 ]
 
-_TOTAL_FRAMES = 30        # total decryption frames
-_FRAME_DELAY = 0.016      # ~16ms per frame (~480ms total)
-_TYPING_DELAY = 0.028     # per character for welcome text
+_TOTAL_FRAMES = 32  # total decryption frames
+_FRAME_DELAY = 0.015  # ~15ms per frame → ~480ms total
+_TYPING_DELAY = 0.025  # per character for welcome text
 
 # ---------------------------------------------------------------------------
 # State
@@ -67,7 +122,7 @@ _banner_shown: bool = False
 # ---------------------------------------------------------------------------
 
 
-def _char_style(char: str, line: str) -> str:
+def _char_style(char: str, row: int) -> str:
     """Determine the Rich style for a resolved character."""
     if char == "⚡":
         return "bold bright_yellow"
@@ -75,16 +130,26 @@ def _char_style(char: str, line: str) -> str:
         return "bright_yellow"
     if char == ".":
         return "dim white"
-    if char in "█▓▒░":
-        return "bright_cyan"
-    # Letters in the AGENTLATCH branding line
-    if "⚡" in line and char.isalpha():
+
+    # ASCII-art text rows → bold block letters
+    if row in _TEXT_ROWS:
         return "bold bright_cyan"
+
+    # Atmosphere gradient (clouds with depth)
+    if char == "█":
+        return "bright_cyan"
+    if char == "▓":
+        return "cyan"
+    if char == "▒":
+        return "dim cyan"
+    if char == "░":
+        return "dim bright_white"
+
     return "white"
 
 
 # ---------------------------------------------------------------------------
-# Resolve Map — pre-compute when each character "decrypts"
+# Resolve Map — when each character "decrypts"
 # ---------------------------------------------------------------------------
 
 
@@ -94,30 +159,27 @@ def _build_resolve_map(
 ) -> list[list[int]]:
     """Assign a resolve-frame to every non-space character.
 
-    - Dot borders (top/bottom) resolve first (frames 0–3).
-    - Interior art decrypts in a diagonal sweep (top-left → bottom-right)
-      with slight random jitter for an organic feel.
+    Dot borders flicker in first (frames 0–3).
+    The rest decrypts in a diagonal sweep (top-left → bottom-right)
+    with random jitter for an organic feel.
     """
     max_row = len(lines)
-    max_col = max(len(ln) for ln in lines) if lines else 1
+    max_col = max((len(ln) for ln in lines), default=1)
 
     rmap: list[list[int]] = []
     for row, line in enumerate(lines):
         row_map: list[int] = []
         for col, ch in enumerate(line):
             if ch == " ":
-                # Spaces are always transparent — resolve instantly.
-                row_map.append(-1)
+                row_map.append(-1)  # always transparent
             elif ch == ".":
-                # Dot borders flicker in very early.
-                row_map.append(random.randint(0, 3))
+                row_map.append(random.randint(0, 3))  # dots early
             else:
-                # Diagonal sweep: mix of row + col progress.
                 row_pct = row / max(max_row - 1, 1)
                 col_pct = col / max(max_col - 1, 1)
                 progress = row_pct * 0.55 + col_pct * 0.45
                 base = int(progress * (total_frames - 6)) + 3
-                jitter = random.randint(-2, 2)
+                jitter = random.randint(-3, 3)
                 frame = max(2, min(total_frames - 1, base + jitter))
                 row_map.append(frame)
         rmap.append(row_map)
@@ -139,18 +201,16 @@ def _render_frame(
 
     for row, line in enumerate(lines):
         for col, ch in enumerate(line):
-            if ch == " " or ch == "":
+            if ch == " ":
                 output.append(" ")
                 continue
 
             resolve_at = resolve_map[row][col]
 
             if frame >= resolve_at:
-                # Resolved — show real character with final color.
-                style = _char_style(ch, line)
+                style = _char_style(ch, row)
                 output.append(ch, style=style)
             else:
-                # Still encrypted — show cycling noise.
                 noise = random.choice(_NOISE_CHARS)
                 output.append(noise, style="dim bright_white")
 
@@ -186,7 +246,7 @@ def _play_animation(console: Console) -> None:
         _render_frame(0, _ART_LINES, resolve_map),
         console=console,
         refresh_per_second=62,
-        transient=True,  # we'll print the final art ourselves
+        transient=True,
     ) as live:
         for frame in range(_TOTAL_FRAMES):
             live.update(_render_frame(frame, _ART_LINES, resolve_map))
@@ -199,8 +259,8 @@ def _play_animation(console: Console) -> None:
     # Phase 2: Welcome text types in.
     console.print()
     _type_text(console, _WELCOME_LINE, "bright_white", _TYPING_DELAY)
-    time.sleep(0.15)
-    _type_text(console, _READY_LINE, "dim bright_green", _TYPING_DELAY * 0.8)
+    time.sleep(0.12)
+    _type_text(console, _READY_LINE, "dim bright_green", _TYPING_DELAY * 0.7)
     console.print()
 
 
@@ -210,9 +270,20 @@ def _play_animation(console: Console) -> None:
 
 
 def _print_fallback(console: Console) -> None:
-    """Clean single-line output for CI / Docker / piped environments."""
-    console.print("[AgentLatch] ⚡ AGENTLATCH v0.1.0")
-    console.print("  Terminal-native agent resilience middleware")
+    """Clean output for CI / Docker / piped environments."""
+    # Still show the ASCII art, just without animation.
+    for row, line in enumerate(_ART_LINES):
+        styled = Text()
+        for ch in line:
+            if ch == " ":
+                styled.append(" ")
+            else:
+                styled.append(ch, style=_char_style(ch, row))
+        console.print(styled)
+
+    console.print()
+    console.print(_WELCOME_LINE, style="bright_white")
+    console.print(_READY_LINE, style="dim bright_green")
     console.print()
 
 
@@ -241,8 +312,8 @@ def initialize_latch(console: Console | None = None) -> None:
     """Display the AgentLatch startup banner (once per process).
 
     - **Interactive terminal**: plays the full cosmic decryption animation
-      followed by a typing effect for the welcome message.
-    - **Non-TTY / CI / Docker**: prints a single clean line.
+      with block-letter ASCII art reveal and typing effect.
+    - **Non-TTY / CI / Docker**: prints the static colored art without animation.
 
     Calling this more than once per process is a no-op.
     """
