@@ -1,0 +1,9 @@
+pyproject.toml
+agentlatch/__init__.py
+agentlatch/_types.py
+agentlatch/tracker.py
+agentlatch.egg-info/PKG-INFO
+agentlatch.egg-info/SOURCES.txt
+agentlatch.egg-info/dependency_links.txt
+agentlatch.egg-info/requires.txt
+agentlatch.egg-info/top_level.txt
