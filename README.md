@@ -1,5 +1,3 @@
-# ⚡ AgentLatch
-
 ![AgentLatch Banner](banner.png)
 
 **Terminal-native agent resilience middleware for Python.**
