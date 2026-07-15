@@ -1,5 +1,7 @@
 # ⚡ AgentLatch
 
+![AgentLatch Banner](banner.png)
+
 **Terminal-native agent resilience middleware for Python.**
 
 AgentLatch is a zero-dependency framework that makes AI agents resilient and observable. It solves two massive pain points in agent development:
