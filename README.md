@@ -10,12 +10,19 @@ AgentLatch is a zero-dependency framework that makes AI agents resilient and obs
 
 ## Quick Install
 
+To install the core package:
 ```bash
-uv pip install -e ".[dev]"
+pip install agentlatch
+```
+
+To install with **FastAPI/Starlette HTTP Middleware** support:
+```bash
+pip install "agentlatch[server]"
 ```
 
 ## Usage
 
+### 1. Resilient Decorators
 ```python
 from agentlatch import profile_agent, safe_tool
 
@@ -28,7 +35,7 @@ def query_database(sql: str) -> str:
 
 @safe_tool(timeout=5.0)
 def call_api(url: str) -> str:
-    """This tool has a 5-second timeout."""
+    """This tool has a 5-second cross-platform timeout."""
     import requests
     return requests.get(url).text
 
@@ -42,9 +49,36 @@ def run_agent():
 run_agent()
 ```
 
+### 2. Smart Response Sampling
+Prevent large tool outputs from blowing up your LLM context window:
+```python
+# Limit response to ~2048 tokens and keep only first 10 list items/rows
+@safe_tool(max_response_tokens=2048, sample_rows=10)
+def fetch_large_dataset():
+    # Returns 1,000 DB records. AgentLatch will slice to 10
+    # and append sampling metadata: {"_agentlatch_sampled": true, "shown": 10, "total": 1000}
+    ...
+```
+
+### 3. FastAPI / Starlette HTTP Middleware (Postman Visibility)
+Get instant visibility into your agent execution flow directly in your API responses when testing via Postman or curl:
+```python
+from fastapi import FastAPI
+from agentlatch.middleware import AgentLatchMiddleware
+
+app = FastAPI()
+
+# Adds timing headers and appends trace data to JSON responses
+app.add_middleware(
+    AgentLatchMiddleware,
+    inject_profile=True,  # Appends "_agentlatch" to JSON response body
+    trace_name="MyChatAgent"
+)
+```
+
 ## What Happens
 
-1. **Execution**: Every `@safe_tool` call is timed and protected.
+1. **Execution**: Every `@safe_tool` call is timed, protected, and sampled.
 2. **On Error**: Instead of crashing, the tool returns a JSON error string:
    ```json
    {
@@ -54,19 +88,32 @@ run_agent()
      "instruction": "The tool execution failed. Review your parameters and retry with corrected inputs."
    }
    ```
-3. **On Completion**: A rich flamegraph is printed to the terminal:
-   ```
-   ┌─────────────────────────────────────────────────────────┐
-   │  ⚡ AGENTLATCH EXECUTION PROFILE                        │
-   │  Total: 1.23s │ Tools: 0.85s │ LLM Reasoning: 0.38s    │
-   ├─────────────────────────────────────────────────────────┤
-   │  ████████████████████████████████████████████ 1.23s      │
-   │  ░░░░████████████░░░████░░░░░░░░░░░░░░░░░░░░            │
-   │      query_db 0.5s  call_api 0.2s                       │
-   │      ▲ ERROR                                             │
-   │  Legend: █ LLM  █ Tool (OK)  █ Tool (ERROR)              │
-   └─────────────────────────────────────────────────────────┘
-   ```
+3. **On Completion (CLI)**: A rich flamegraph is printed to the terminal in development mode.
+4. **On Completion (HTTP / Postman)**:
+   * **Headers tab**:
+     ```
+     X-AgentLatch-Version: 0.1.0
+     X-AgentLatch-Duration-Ms: 1234
+     X-AgentLatch-Tools-Ms: 850
+     X-AgentLatch-Errors: 1
+     ```
+   * **Response Body**:
+     ```json
+     {
+       "response": "Based on the database...",
+       "_agentlatch": {
+         "version": "0.1.0",
+         "trace_id": "abc-123",
+         "total_ms": 1234,
+         "tool_ms": 850,
+         "llm_reasoning_ms": 384,
+         "tools": [
+           {"name": "query_database", "duration_ms": 305, "status": "success"}
+         ],
+         "errors_count": 0
+       }
+     }
+     ```
 
 ## Features
 
@@ -74,10 +121,13 @@ run_agent()
 |---------|-------------|
 | `@safe_tool` | Wraps any function — catches exceptions, returns JSON errors |
 | `@safe_tool(timeout=N)` | Adds a thread-based timeout (cross-platform) |
+| `@safe_tool(sample_rows=N)` | Automatically slices massive JSON list outputs to first N items |
+| `@safe_tool(max_response_tokens=N)` | Truncates tool string responses if they exceed approximate token budget |
 | `@profile_agent` | Traces the full agent loop and renders the flamegraph |
+| `AgentLatchMiddleware` | Starlette/FastAPI middleware for Postman & curl trace observability |
 | Async support | Both decorators work with `async def` functions |
+| Dev Mode Guard | Automatically suppresses ASCII visuals in production (`AGENTLATCH_ENV=production`) |
 | Framework agnostic | Works with LangGraph, AutoGen, CrewAI, or vanilla scripts |
-| CI-safe | Banner auto-disables in non-TTY environments |
 
 ## Running Examples
 
@@ -87,12 +137,16 @@ python examples/vanilla_agent.py
 
 # LangGraph-style state machine
 python examples/langgraph_agent.py
+
+# FastAPI + LangGraph + Groq Agent (requires GROQ_API_KEY)
+export GROQ_API_KEY="your-groq-key"
+uvicorn examples.fastapi_agent:app --reload
 ```
 
 ## Running Tests
 
 ```bash
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,server]"
 pytest tests/ -v
 ```
 
@@ -100,8 +154,10 @@ pytest tests/ -v
 
 - **`contextvars`** — Thread-safe trace propagation without manual trace IDs
 - **`concurrent.futures`** — Cross-platform timeouts (no `signal.alarm`)
-- **`rich`** — Premium terminal rendering (the only external dependency)
+- **`rich`** — Premium terminal rendering
+- **`starlette`** — Lightweight core HTTP middleware support
 
 ## License
 
 MIT
+
