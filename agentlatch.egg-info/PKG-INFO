@@ -4,6 +4,9 @@ Version: 0.1.0
 Summary: Zero-dependency, terminal-native Python middleware for resilient and observable AI agents.
 Author: AgentLatch Contributors
 License: MIT
+Project-URL: Homepage, https://github.com/arav7781/AgentLatch
+Project-URL: Repository, https://github.com/arav7781/AgentLatch
+Project-URL: Issues, https://github.com/arav7781/AgentLatch/issues
 Keywords: agents,llm,observability,middleware,terminal
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
@@ -16,12 +19,17 @@ Classifier: Programming Language :: Python :: 3.13
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: rich>=13.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
+Provides-Extra: server
+Requires-Dist: starlette>=0.27; extra == "server"
+Requires-Dist: httpx>=0.24; extra == "server"
+Dynamic: license-file
 
-# ⚡ AgentLatch
+![AgentLatch Banner](banner.png)
 
 **Terminal-native agent resilience middleware for Python.**
 
@@ -67,9 +75,8 @@ run_agent()
 
 ## What Happens
 
-1. **Startup**: A Claude Code-style "decryption" banner animation plays.
-2. **Execution**: Every `@safe_tool` call is timed and protected.
-3. **On Error**: Instead of crashing, the tool returns a JSON error string:
+1. **Execution**: Every `@safe_tool` call is timed and protected.
+2. **On Error**: Instead of crashing, the tool returns a JSON error string:
    ```json
    {
      "status": "error",
@@ -78,7 +85,7 @@ run_agent()
      "instruction": "The tool execution failed. Review your parameters and retry with corrected inputs."
    }
    ```
-4. **On Completion**: A rich flamegraph is printed to the terminal:
+3. **On Completion**: A rich flamegraph is printed to the terminal:
    ```
    ┌─────────────────────────────────────────────────────────┐
    │  ⚡ AGENTLATCH EXECUTION PROFILE                        │

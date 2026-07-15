@@ -44,9 +44,8 @@ run_agent()
 
 ## What Happens
 
-1. **Startup**: A Claude Code-style "decryption" banner animation plays.
-2. **Execution**: Every `@safe_tool` call is timed and protected.
-3. **On Error**: Instead of crashing, the tool returns a JSON error string:
+1. **Execution**: Every `@safe_tool` call is timed and protected.
+2. **On Error**: Instead of crashing, the tool returns a JSON error string:
    ```json
    {
      "status": "error",
@@ -55,7 +54,7 @@ run_agent()
      "instruction": "The tool execution failed. Review your parameters and retry with corrected inputs."
    }
    ```
-4. **On Completion**: A rich flamegraph is printed to the terminal:
+3. **On Completion**: A rich flamegraph is printed to the terminal:
    ```
    ┌─────────────────────────────────────────────────────────┐
    │  ⚡ AGENTLATCH EXECUTION PROFILE                        │

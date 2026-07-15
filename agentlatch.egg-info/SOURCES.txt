@@ -1,10 +1,14 @@
+LICENSE
 README.md
 pyproject.toml
 agentlatch/__init__.py
 agentlatch/_types.py
 agentlatch/banner.py
+agentlatch/config.py
 agentlatch/decorators.py
+agentlatch/middleware.py
 agentlatch/renderer.py
+agentlatch/sampler.py
 agentlatch/tracker.py
 agentlatch.egg-info/PKG-INFO
 agentlatch.egg-info/SOURCES.txt
@@ -13,5 +17,7 @@ agentlatch.egg-info/requires.txt
 agentlatch.egg-info/top_level.txt
 tests/test_banner.py
 tests/test_decorators.py
+tests/test_middleware.py
 tests/test_renderer.py
+tests/test_sampler.py
 tests/test_tracker.py

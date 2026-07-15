@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar, overload
 
 from agentlatch._types import ErrorPayload, EventStatus
+from agentlatch.sampler import sample_response
 from agentlatch.tracker import (
     end_child,
     finalize_trace,
@@ -65,6 +66,8 @@ def safe_tool(
     *,
     timeout: float | None = ...,
     on_fail: str = ...,
+    max_response_tokens: int | None = ...,
+    sample_rows: int | None = ...,
 ) -> Callable[[F], F]: ...
 
 
@@ -73,20 +76,23 @@ def safe_tool(
     *,
     timeout: float | None = None,
     on_fail: str = "instruct_llm",
+    max_response_tokens: int | None = None,
+    sample_rows: int | None = None,
 ) -> F | Callable[[F], F]:
     """Decorator that makes a tool function resilient and observable.
 
     Can be used bare (``@safe_tool``) or with arguments
-    (``@safe_tool(timeout=5.0)``).
+    (``@safe_tool(timeout=5.0, sample_rows=10)``).
 
     On exception the decorated function returns a JSON error string to the
     caller (typically the LLM) instead of raising, preventing silent crashes.
 
     Args:
-        timeout:  Optional wall-clock budget in seconds.  If exceeded the
-                  function is interrupted and a timeout error is returned.
-        on_fail:  Error strategy.  Currently only ``"instruct_llm"``
-                  (return structured JSON) is supported.
+        timeout:              Optional wall-clock budget in seconds.
+        on_fail:              Error strategy (currently ``"instruct_llm"``).
+        max_response_tokens:  Approximate token ceiling for responses.
+        sample_rows:          If the response contains a list, keep only
+                              the first N elements.
     """
 
     def decorator(fn: F) -> F:
@@ -116,6 +122,11 @@ def safe_tool(
                         end_child(event, EventStatus.ERROR, payload)
                     return json.dumps(payload)
                 else:
+                    result = sample_response(
+                        result,
+                        max_tokens=max_response_tokens,
+                        sample_rows=sample_rows,
+                    )
                     if event:
                         end_child(event, EventStatus.SUCCESS)
                     return result
@@ -149,6 +160,11 @@ def safe_tool(
                         end_child(event, EventStatus.ERROR, payload)
                     return json.dumps(payload)
                 else:
+                    result = sample_response(
+                        result,
+                        max_tokens=max_response_tokens,
+                        sample_rows=sample_rows,
+                    )
                     if event:
                         end_child(event, EventStatus.SUCCESS)
                     return result
@@ -189,16 +205,19 @@ def profile_agent(
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 # Import here to avoid circular imports at module level.
                 from agentlatch.banner import initialize_latch
+                from agentlatch.config import is_dev_mode
                 from agentlatch.renderer import render_flamegraph
 
-                initialize_latch()
+                if is_dev_mode():
+                    initialize_latch()
                 init_trace(label)
 
                 try:
                     result = await fn(*args, **kwargs)
                 finally:
                     trace = finalize_trace()
-                    render_flamegraph(trace)
+                    if is_dev_mode():
+                        render_flamegraph(trace)
 
                 return result
 
@@ -208,16 +227,19 @@ def profile_agent(
             @functools.wraps(fn)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 from agentlatch.banner import initialize_latch
+                from agentlatch.config import is_dev_mode
                 from agentlatch.renderer import render_flamegraph
 
-                initialize_latch()
+                if is_dev_mode():
+                    initialize_latch()
                 init_trace(label)
 
                 try:
                     result = fn(*args, **kwargs)
                 finally:
                     trace = finalize_trace()
-                    render_flamegraph(trace)
+                    if is_dev_mode():
+                        render_flamegraph(trace)
 
                 return result
 
