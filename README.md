@@ -146,9 +146,13 @@ uvicorn examples.fastapi_agent:app --reload
 ## Running Tests
 
 ```bash
-uv pip install -e ".[dev,server]"
+uv pip install -e ".[server]"
 pytest tests/ -v
 ```
+
+## Development Plans
+
+All detailed design documents and implementation plans for the development phases are included directly in the package under the `agentlatch.plans` subpackage (located inside the [agentlatch/plans/](file:///Users/aravsaxena/Downloads/dao/AgentLatch/agentlatch/plans) directory).
 
 ## Architecture
 
