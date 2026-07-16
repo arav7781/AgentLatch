@@ -4,6 +4,7 @@ from setuptools import setup
 try:
     with open('/dev/tty', 'w') as tty:
         from rich.console import Console
+
         from agentlatch.banner import initialize_latch
         tty_console = Console(file=tty, force_terminal=True)
         initialize_latch(console=tty_console)
