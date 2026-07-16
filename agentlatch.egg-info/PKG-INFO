@@ -21,9 +21,9 @@ Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: rich>=13.0
+Requires-Dist: pytest>=7.0
+Requires-Dist: pytest-asyncio>=0.21
 Provides-Extra: dev
-Requires-Dist: pytest>=7.0; extra == "dev"
-Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
 Provides-Extra: server
 Requires-Dist: starlette>=0.27; extra == "server"
 Requires-Dist: httpx>=0.24; extra == "server"
@@ -180,6 +180,10 @@ uvicorn examples.fastapi_agent:app --reload
 uv pip install -e ".[dev,server]"
 pytest tests/ -v
 ```
+
+## Development Plans
+
+All detailed design documents and implementation plans for the development phases are included directly in the package under the `agentlatch.plans` subpackage (located inside the [agentlatch/plans/](file:///Users/aravsaxena/Downloads/dao/AgentLatch/agentlatch/plans) directory).
 
 ## Architecture
 

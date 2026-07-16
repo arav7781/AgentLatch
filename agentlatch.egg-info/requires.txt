@@ -1,8 +1,8 @@
 rich>=13.0
-
-[dev]
 pytest>=7.0
 pytest-asyncio>=0.21
+
+[dev]
 
 [server]
 starlette>=0.27

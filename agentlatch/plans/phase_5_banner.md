@@ -1,6 +1,6 @@
 # Phase 5 — Startup Banner Animation
 
-> Feature: **Startup Banner** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 4.5).
+> Feature: **Startup Banner** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 4.5).
 > Status: **✅ Done** · Depends on: None.
 > Written to document the interactive startup visualization.
 
@@ -38,7 +38,7 @@ Provide a premium, terminal-native interactive welcome experience. Show a "decry
 - Safe console print logic handles different screen resolutions gracefully.
 
 ## 6. Tests
-Implemented in [`tests/test_banner.py`](../tests/test_banner.py):
+Implemented in [`tests/test_banner.py`](../../tests/test_banner.py):
 - Verification that the banner initialization executes without raising exceptions.
 - Verification that repeated triggers are correctly blocked by the process-level guard flag.
 - Assertion of tagline metadata strings.
@@ -46,7 +46,7 @@ Implemented in [`tests/test_banner.py`](../tests/test_banner.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/banner.py`](../agentlatch/banner.py) | **[NEW]** Decryption algorithm and welcome screen logic. |
+| [`agentlatch/banner.py`](../../agentlatch/banner.py) | **[NEW]** Decryption algorithm and welcome screen logic. |
 
 ## 8. Acceptance Criteria
 - Banner performs a smooth decryption sweep from noise to full layout on interactive terminals.

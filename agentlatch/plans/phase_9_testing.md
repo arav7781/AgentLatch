@@ -1,6 +1,6 @@
 # Phase 9 — Comprehensive Testing
 
-> Feature: **Testing Suite** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 6).
+> Feature: **Testing Suite** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 6).
 > Status: **✅ Done** · Depends on: All previous phases.
 > Written to document the testing suite architecture.
 
@@ -50,12 +50,12 @@ pytest tests/ -v
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`tests/test_tracker.py`](../tests/test_tracker.py) | **[NEW]** Tests for context tracking. |
-| [`tests/test_decorators.py`](../tests/test_decorators.py) | **[NEW]** Tests for decorators. |
-| [`tests/test_sampler.py`](../tests/test_sampler.py) | **[NEW]** Tests for row/token sampling. |
-| [`tests/test_middleware.py`](../tests/test_middleware.py) | **[NEW]** Tests for HTTP middleware. |
-| [`tests/test_renderer.py`](../tests/test_renderer.py) | **[NEW]** Tests for Rich flamegraphs. |
-| [`tests/test_banner.py`](../tests/test_banner.py) | **[NEW]** Tests for decrypting initialization banner. |
+| [`tests/test_tracker.py`](../../tests/test_tracker.py) | **[NEW]** Tests for context tracking. |
+| [`tests/test_decorators.py`](../../tests/test_decorators.py) | **[NEW]** Tests for decorators. |
+| [`tests/test_sampler.py`](../../tests/test_sampler.py) | **[NEW]** Tests for row/token sampling. |
+| [`tests/test_middleware.py`](../../tests/test_middleware.py) | **[NEW]** Tests for HTTP middleware. |
+| [`tests/test_renderer.py`](../../tests/test_renderer.py) | **[NEW]** Tests for Rich flamegraphs. |
+| [`tests/test_banner.py`](../../tests/test_banner.py) | **[NEW]** Tests for decrypting initialization banner. |
 
 ## 8. Acceptance Criteria
 - All tests pass successfully.

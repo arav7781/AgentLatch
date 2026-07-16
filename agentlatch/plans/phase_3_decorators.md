@@ -1,6 +1,6 @@
 # Phase 3 — Resilience & Profiling Decorators
 
-> Feature: **Decorators** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 3).
+> Feature: **Decorators** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 3).
 > Status: **✅ Done** · Depends on: **Phase 2** (timing engine) and **Phase 7** (response sampling).
 > Written to document execution decorators for tools and agent loops.
 
@@ -55,7 +55,7 @@ Support both synchronous and asynchronous operations transparently.
 - **Graceful degradation:** If `@safe_tool` is executed outside of an active `@profile_agent` context, it skips tracking events but still acts as a crash guard, trapping errors and enforcing timeouts safely.
 
 ## 6. Tests
-Implemented in [`tests/test_decorators.py`](../tests/test_decorators.py):
+Implemented in [`tests/test_decorators.py`](../../tests/test_decorators.py):
 - Synchronous and asynchronous tool success/failure checks.
 - Synchronous and asynchronous timeouts.
 - Proper behavior when running nested tools inside an agent loop.
@@ -64,7 +64,7 @@ Implemented in [`tests/test_decorators.py`](../tests/test_decorators.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/decorators.py`](../agentlatch/decorators.py) | **[NEW]** Implement `@safe_tool` and `@profile_agent` wrappers. |
+| [`agentlatch/decorators.py`](../../agentlatch/decorators.py) | **[NEW]** Implement `@safe_tool` and `@profile_agent` wrappers. |
 
 ## 8. Acceptance Criteria
 - Functions decorated with `@safe_tool` return a JSON error string on failure, and do not raise exceptions.

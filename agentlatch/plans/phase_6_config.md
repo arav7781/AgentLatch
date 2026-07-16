@@ -1,6 +1,6 @@
 # Phase 6 — Global Configuration Management
 
-> Feature: **Runtime Configuration** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Architectural Safeguards & Portability).
+> Feature: **Runtime Configuration** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Architectural Safeguards & Portability).
 > Status: **✅ Done** · Depends on: None.
 > Written to document environment detection and console options.
 
@@ -49,7 +49,7 @@ Implemented and verified as part of the integration tests:
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/config.py`](../agentlatch/config.py) | **[NEW]** Environment detection and programmatic configuration toggle. |
+| [`agentlatch/config.py`](../../agentlatch/config.py) | **[NEW]** Environment detection and programmatic configuration toggle. |
 
 ## 8. Acceptance Criteria
 - Setting `AGENTLATCH_ENV=production` silences all flamegraph panels and startup animations from standard output.

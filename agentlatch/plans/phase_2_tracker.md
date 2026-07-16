@@ -1,6 +1,6 @@
 # Phase 2 — Context & Timing Engine
 
-> Feature: **Execution Tracking** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 2).
+> Feature: **Execution Tracking** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 2).
 > Status: **✅ Done** · Depends on: **Phase 1** (core types).
 > Written to document the ContextVar-based trace execution mechanism.
 
@@ -48,7 +48,7 @@ Implement a thread-safe, coroutine-safe execution tracing engine using Python's 
 - **Context Integrity:** Every `start_child` must pair with an `end_child` or the tracker context stack remains offset. This is handled dynamically via decorators in Phase 3.
 
 ## 6. Tests
-Implemented in [`tests/test_tracker.py`](../tests/test_tracker.py):
+Implemented in [`tests/test_tracker.py`](../../tests/test_tracker.py):
 - Validation of trace tree hierarchy.
 - Thread-level isolation verification (running concurrent traces on separate threads to ensure they do not contaminate each other).
 - Error mapping inside trace tree nodes.
@@ -56,7 +56,7 @@ Implemented in [`tests/test_tracker.py`](../tests/test_tracker.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/tracker.py`](../agentlatch/tracker.py) | **[NEW]** Trace tracking implementation (`TraceEvent` and state modifiers). |
+| [`agentlatch/tracker.py`](../../agentlatch/tracker.py) | **[NEW]** Trace tracking implementation (`TraceEvent` and state modifiers). |
 
 ## 8. Acceptance Criteria
 - Nested tool calls correctly display in the final trace structure with exact relative hierarchy and parent relationships.

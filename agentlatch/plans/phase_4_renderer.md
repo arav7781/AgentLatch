@@ -1,6 +1,6 @@
 # Phase 4 — Terminal Flamegraph Renderer
 
-> Feature: **Terminal Visualization** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 4).
+> Feature: **Terminal Visualization** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 4).
 > Status: **✅ Done** · Depends on: **Phase 2** (timing engine).
 > Written to document the CLI flamegraph drawing mechanism.
 
@@ -42,7 +42,7 @@ Provide immediate visibility into execution timelines directly in the developer'
 - Output is rendered using a standard `rich.console.Console` wrapper, allowing customization or output capture if testing.
 
 ## 6. Tests
-Implemented in [`tests/test_renderer.py`](../tests/test_renderer.py):
+Implemented in [`tests/test_renderer.py`](../../tests/test_renderer.py):
 - Test rendering logic for error-free traces.
 - Test rendering with tool timeouts.
 - Test rendering of exception message mapping.
@@ -51,7 +51,7 @@ Implemented in [`tests/test_renderer.py`](../tests/test_renderer.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/renderer.py`](../agentlatch/renderer.py) | **[NEW]** Terminal renderer logic implementation. |
+| [`agentlatch/renderer.py`](../../agentlatch/renderer.py) | **[NEW]** Terminal renderer logic implementation. |
 
 ## 8. Acceptance Criteria
 - Flamegraph displays correct proportions for LLM vs. tool execution times.

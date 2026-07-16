@@ -16,6 +16,17 @@ agentlatch.egg-info/SOURCES.txt
 agentlatch.egg-info/dependency_links.txt
 agentlatch.egg-info/requires.txt
 agentlatch.egg-info/top_level.txt
+agentlatch/plans/README.md
+agentlatch/plans/__init__.py
+agentlatch/plans/phase_1_scaffolding.md
+agentlatch/plans/phase_2_tracker.md
+agentlatch/plans/phase_3_decorators.md
+agentlatch/plans/phase_4_renderer.md
+agentlatch/plans/phase_5_banner.md
+agentlatch/plans/phase_6_config.md
+agentlatch/plans/phase_7_sampler.md
+agentlatch/plans/phase_8_middleware.md
+agentlatch/plans/phase_9_testing.md
 tests/test_banner.py
 tests/test_decorators.py
 tests/test_middleware.py

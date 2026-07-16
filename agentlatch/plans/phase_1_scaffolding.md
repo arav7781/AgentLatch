@@ -1,6 +1,6 @@
 # Phase 1 — Project Scaffolding & Core Types
 
-> Feature: **Project Scaffolding** (see [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) — Phase 1).
+> Feature: **Project Scaffolding** (see [`INSTRUCTIONS.md`](../../INSTRUCTIONS.md) — Phase 1).
 > Status: **✅ Done** · Depends on: None.
 > Written to document the initial baseline.
 
@@ -49,8 +49,8 @@ Establish the Python project structure, package scaffolding, and central type de
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`pyproject.toml`](../pyproject.toml) | **[NEW]** Setup project dependencies, meta details, dev options. |
-| [`agentlatch/_types.py`](../agentlatch/_types.py) | **[NEW]** Define `EventStatus` and `ErrorPayload`. |
+| [`pyproject.toml`](../../pyproject.toml) | **[NEW]** Setup project dependencies, meta details, dev options. |
+| [`agentlatch/_types.py`](../../agentlatch/_types.py) | **[NEW]** Define `EventStatus` and `ErrorPayload`. |
 
 ## 8. Acceptance Criteria
 - Python package can be successfully installed in a virtual environment.

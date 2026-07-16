@@ -1,6 +1,6 @@
 # Phase 7 — Response Sampling & Truncation
 
-> Feature: **Response Sampling** (see [`README.md`](../README.md) — Smart Response Sampling).
+> Feature: **Response Sampling** (see [`README.md`](../../README.md) — Smart Response Sampling).
 > Status: **✅ Done** · Depends on: None.
 > Written to document the LLM context compression engine.
 
@@ -46,7 +46,7 @@ Intelligently compress large tool returns (like database responses or API payloa
 - Preserves object structures and ensures that metadata injected in JSON lists does not conflict with original list typing.
 
 ## 6. Tests
-Implemented in [`tests/test_sampler.py`](../tests/test_sampler.py):
+Implemented in [`tests/test_sampler.py`](../../tests/test_sampler.py):
 - Validation of list slicing under target keys (e.g. `items`, `rows`).
 - Serialization check for plain text and raw dictionaries.
 - Verification of token truncation markers.
@@ -55,7 +55,7 @@ Implemented in [`tests/test_sampler.py`](../tests/test_sampler.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/sampler.py`](../agentlatch/sampler.py) | **[NEW]** Sampling algorithms, key lists, and truncation helper functions. |
+| [`agentlatch/sampler.py`](../../agentlatch/sampler.py) | **[NEW]** Sampling algorithms, key lists, and truncation helper functions. |
 
 ## 8. Acceptance Criteria
 - Databases output lists are pruned correctly to the limit, appending a valid `_agentlatch_sampled` tracking dictionary.

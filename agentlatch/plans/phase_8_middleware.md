@@ -1,6 +1,6 @@
 # Phase 8 — HTTP Server Middleware
 
-> Feature: **HTTP Observability Middleware** (see [`README.md`](../README.md) — FastAPI / Starlette HTTP Middleware).
+> Feature: **HTTP Observability Middleware** (see [`README.md`](../../README.md) — FastAPI / Starlette HTTP Middleware).
 > Status: **✅ Done** · Depends on: **Phase 2** (timing engine) and **Phase 1** (core types).
 > Written to document Starlette / FastAPI middleware integration.
 
@@ -54,7 +54,7 @@ Provide immediate visibility into agent execution states directly in REST respon
 - Prevents memory leaks by ensuring the trace lifecycle is finalized and context variable references are released.
 
 ## 6. Tests
-Implemented in [`tests/test_middleware.py`](../tests/test_middleware.py):
+Implemented in [`tests/test_middleware.py`](../../tests/test_middleware.py):
 - Validation of header injection on standard JSON endpoints.
 - Integration tests using Starlette `TestClient`.
 - Verification of body injection on success and tool failure states.
@@ -63,7 +63,7 @@ Implemented in [`tests/test_middleware.py`](../tests/test_middleware.py):
 ## 7. Files Touched
 | File | Change |
 |---|---|
-| [`agentlatch/middleware.py`](../agentlatch/middleware.py) | **[NEW]** Starlette BaseHTTPMiddleware implementation. |
+| [`agentlatch/middleware.py`](../../agentlatch/middleware.py) | **[NEW]** Starlette BaseHTTPMiddleware implementation. |
 
 ## 8. Acceptance Criteria
 - Response headers include:
