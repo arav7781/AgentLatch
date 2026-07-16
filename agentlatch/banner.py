@@ -241,20 +241,17 @@ def _play_animation(console: Console) -> None:
     """Run the full cosmic reveal sequence."""
     resolve_map = _build_resolve_map(_ART_LINES, _TOTAL_FRAMES)
 
-    # Phase 1: Decryption sweep of the ASCII art.
+    # Use transient=False so the final frame remains in place, avoiding double-printing.
     with Live(
         _render_frame(0, _ART_LINES, resolve_map),
         console=console,
         refresh_per_second=62,
-        transient=True,
+        transient=False,
     ) as live:
-        for frame in range(_TOTAL_FRAMES):
+        for frame in range(_TOTAL_FRAMES + 1):
             live.update(_render_frame(frame, _ART_LINES, resolve_map))
             time.sleep(_FRAME_DELAY)
 
-    # Print the final, fully-resolved art (stays on screen).
-    final_art = _render_frame(_TOTAL_FRAMES, _ART_LINES, resolve_map)
-    console.print(final_art, end="")
 
     # Phase 2: Welcome text types in.
     console.print()
@@ -321,6 +318,9 @@ def initialize_latch(console: Console | None = None) -> None:
     if _banner_shown:
         return
     _banner_shown = True
+
+    if os.environ.get("AGENTLATCH_ENV", "").lower().strip() == "production":
+        return
 
     con = console or Console()
 

@@ -95,6 +95,11 @@ class AgentLatchMiddleware(BaseHTTPMiddleware):
         self.header_prefix = header_prefix
         self.trace_name = trace_name
 
+        # Display the startup banner on server startup (once per process).
+        from agentlatch.banner import initialize_latch
+        initialize_latch()
+
+
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         """Wrap the request with an AgentLatch trace."""
         # Initialize trace for this request.
