@@ -252,7 +252,6 @@ def _play_animation(console: Console) -> None:
             live.update(_render_frame(frame, _ART_LINES, resolve_map))
             time.sleep(_FRAME_DELAY)
 
-
     # Phase 2: Welcome text types in.
     console.print()
     _type_text(console, _WELCOME_LINE, "bright_white", _TYPING_DELAY)

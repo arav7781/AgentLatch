@@ -9,4 +9,5 @@ def pytest_sessionstart(session):
     Prints the AgentLatch cosmic ASCII startup banner.
     """
     from agentlatch.banner import initialize_latch
+
     initialize_latch()
