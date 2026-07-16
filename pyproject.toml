@@ -47,6 +47,9 @@ server = [
 [tool.setuptools.packages.find]
 include = ["agentlatch*"]
 
+[tool.setuptools.package-data]
+agentlatch = ["plans/*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
