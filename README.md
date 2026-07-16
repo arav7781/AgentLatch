@@ -20,7 +20,32 @@ To install with **FastAPI/Starlette HTTP Middleware** support:
 pip install "agentlatch[server]"
 ```
 
+## Setup Virtual Environment
+
+Before installing the package, it is recommended to create and activate a virtual environment to isolate your dependencies:
+
+```bash
+# Create a virtual environment
+python -m venv .venv
+
+# Activate it (macOS/Linux)
+source .venv/bin/activate
+
+# Activate it (Windows)
+.venv\Scripts\activate
+```
+
+## Core Use Cases
+
+AgentLatch is built to address critical requirements of production-ready AI agents:
+
+* **Exception Interception & Self-Correction**: Raw tool crashes throw exceptions that break agent runs. `@safe_tool` translates these exceptions into structured JSON error prompts. The LLM parses the error feedback and corrects its parameters or query dynamically without failing.
+* **Context Window Budgeting (Sampling)**: Large list returns or massive token blocks can overflow context windows. `@safe_tool(max_response_tokens=N, sample_rows=N)` automatically truncates response strings and lists, injecting metadata so the LLM is aware of the sampling.
+* **Execution Timeline and Flamegraphs**: Track down slow operations (e.g. database lookups, external APIs). `@profile_agent` creates a visual breakdown of your tool durations vs. LLM reasoning directly in the CLI.
+* **HTTP Endpoint Observability**: Debug agent execution flows during integration testing. `AgentLatchMiddleware` injects detailed trace logs directly into your Starlette/FastAPI headers and JSON response bodies for Postman or cURL debugging.
+
 ## Usage
+
 
 ### 1. Resilient Decorators
 ```python
@@ -155,6 +180,29 @@ pytest tests/ -v
 All detailed design documents and implementation plans for the development phases are included directly in the package under the `agentlatch.plans` subpackage (located inside the [agentlatch/plans/](file:///Users/aravsaxena/Downloads/dao/AgentLatch/agentlatch/plans) directory).
 
 ## Architecture
+
+```mermaid
+graph TD
+    subgraph Client/Terminal
+        A[profile_agent decorator] -->|1. init_trace| B(contextvars State)
+    end
+
+    subgraph Execution Loop
+        B -->|2. Runs Agent| C[Agent LLM Reasoning]
+        C -->|3. Calls Tool| D[safe_tool decorator]
+        D -->|4. start_child| B
+        D -->|5. Executes Tool| E[Wrapped Tool Function]
+        E -->|6a. Succeeds/Samples| F[Response Content]
+        E -->|6b. Throws Exception| G[Structured JSON Error]
+        F -->|7. end_child| B
+        G -->|7. end_child| B
+    end
+
+    subgraph Output
+        B -->|8. finalize_trace| H[render_flamegraph]
+        H -->|9. Prints Profile| I[Terminal CLI Console]
+    end
+```
 
 - **`contextvars`** — Thread-safe trace propagation without manual trace IDs
 - **`concurrent.futures`** — Cross-platform timeouts (no `signal.alarm`)
