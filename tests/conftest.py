@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def pytest_sessionstart(session):
     """Called before the test session starts.
@@ -11,4 +9,5 @@ def pytest_sessionstart(session):
     Prints the AgentLatch cosmic ASCII startup banner.
     """
     from agentlatch.banner import initialize_latch
+
     initialize_latch()
