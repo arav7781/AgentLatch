@@ -152,3 +152,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Project plans/phases
+plans/
