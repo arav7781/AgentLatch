@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentlatch"
-version = "0.1.0"
+version = "0.2.0"
 description = "Zero-dependency, terminal-native Python middleware for resilient and observable AI agents."
 readme = "README.md"
 license = {text = "MIT"}
@@ -41,6 +41,21 @@ dev = []
 server = [
     "starlette>=0.27",
     "httpx>=0.24",
+]
+vector = [
+    "psycopg[binary]>=3.1",
+    "pgvector>=0.2",
+]
+qdrant = [
+    "qdrant-client>=1.7",
+]
+graph = [
+    "neo4j>=5.0",
+]
+all-memory = [
+    "agentlatch[vector]",
+    "agentlatch[qdrant]",
+    "agentlatch[graph]",
 ]
 
 [tool.setuptools.packages.find]

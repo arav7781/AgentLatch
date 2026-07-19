@@ -13,7 +13,12 @@ This simulates an AI agent that:
 
 from __future__ import annotations
 
+import sys
 import time
+from pathlib import Path
+
+# Bootstrap local package path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agentlatch import profile_agent, safe_tool
 

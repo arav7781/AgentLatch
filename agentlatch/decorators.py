@@ -1,7 +1,9 @@
 """Decorators that form AgentLatch's public API.
 
-* ``@safe_tool``     — wraps tool functions with error interception & timing.
-* ``@profile_agent`` — wraps the outer agent loop with tracing & visualization.
+* ``@safe_tool``       — wraps tool functions with error interception & timing.
+* ``@profile_agent``   — wraps the outer agent loop with tracing & visualization.
+* ``@context_aware``   — adds structured memory snapshots to tool calls.
+* ``@intent``          — tags tool calls with intent labels for memory retrieval.
 """
 
 from __future__ import annotations
@@ -23,6 +25,9 @@ from agentlatch.tracker import (
     init_trace,
     start_child,
 )
+
+# Re-export memory decorators so users can import from agentlatch.decorators
+from agentlatch.memory.decorators import context_aware, intent  # noqa: F401
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -186,6 +191,8 @@ def profile_agent(
     func: F | None = None,
     *,
     name: str | None = None,
+    memory_backend: Any | None = None,
+    enable_memory: bool = True,
 ) -> F | Callable[[F], F]:
     """Decorator for the main agent loop.
 
@@ -194,6 +201,14 @@ def profile_agent(
 
     Can be used bare (``@profile_agent``) or with a custom name
     (``@profile_agent(name="MyAgent")``).
+
+    Args:
+        name:            Custom label for the root trace event.
+        memory_backend:  Optional ``MemoryBackend`` instance. If ``None``
+                         and *enable_memory* is ``True``, a default
+                         in-memory SQLite backend is used.
+        enable_memory:   If ``True`` (default), automatically initializes
+                         memory for the agent run.
     """
 
     def decorator(fn: F) -> F:
@@ -206,11 +221,17 @@ def profile_agent(
                 # Import here to avoid circular imports at module level.
                 from agentlatch.banner import initialize_latch
                 from agentlatch.config import is_dev_mode
+                from agentlatch.memory.context import get_memory, init_memory
                 from agentlatch.renderer import render_flamegraph
 
                 if is_dev_mode():
                     initialize_latch()
                 init_trace(label)
+
+                # Initialize memory if enabled and not already active.
+                memory = None
+                if enable_memory and get_memory() is None:
+                    memory = init_memory(memory_backend)
 
                 try:
                     result = await fn(*args, **kwargs)
@@ -218,6 +239,12 @@ def profile_agent(
                     trace = finalize_trace()
                     if is_dev_mode():
                         render_flamegraph(trace)
+                    # Close memory if we created it.
+                    if memory is not None:
+                        try:
+                            memory.close()
+                        except Exception:
+                            pass
 
                 return result
 
@@ -228,11 +255,17 @@ def profile_agent(
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 from agentlatch.banner import initialize_latch
                 from agentlatch.config import is_dev_mode
+                from agentlatch.memory.context import get_memory, init_memory
                 from agentlatch.renderer import render_flamegraph
 
                 if is_dev_mode():
                     initialize_latch()
                 init_trace(label)
+
+                # Initialize memory if enabled and not already active.
+                memory = None
+                if enable_memory and get_memory() is None:
+                    memory = init_memory(memory_backend)
 
                 try:
                     result = fn(*args, **kwargs)
@@ -240,6 +273,11 @@ def profile_agent(
                     trace = finalize_trace()
                     if is_dev_mode():
                         render_flamegraph(trace)
+                    if memory is not None:
+                        try:
+                            memory.close()
+                        except Exception:
+                            pass
 
                 return result
 

@@ -10,6 +10,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
+from agentlatch import __version__
 from agentlatch.config import reset_dev_mode, set_dev_mode
 from agentlatch.decorators import safe_tool
 from agentlatch.middleware import AgentLatchMiddleware
@@ -87,7 +88,7 @@ class TestMiddlewareHeaders:
         client = TestClient(_build_app())
         resp = client.get("/chat")
 
-        assert resp.headers["X-AgentLatch-Version"] == "0.1.0"
+        assert resp.headers["X-AgentLatch-Version"] == __version__
         assert int(resp.headers["X-AgentLatch-Duration-Ms"]) > 0
         assert int(resp.headers["X-AgentLatch-Errors"]) >= 1  # bad query fails
 
@@ -139,7 +140,7 @@ class TestMiddlewareBody:
         resp = client.get("/chat")
         profile = resp.json()["_agentlatch"]
 
-        assert profile["version"] == "0.1.0"
+        assert profile["version"] == __version__
         assert len(profile["trace_id"]) > 0
 
     def test_disabled_injection(self):

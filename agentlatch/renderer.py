@@ -22,6 +22,9 @@ _COLORS = {
     EventStatus.SUCCESS: "bright_green",
     EventStatus.ERROR: "bright_red",
     EventStatus.TIMEOUT: "bright_yellow",
+    EventStatus.RETRY: "bright_magenta",
+    EventStatus.MEMORY_OP: "bright_cyan",
+    EventStatus.LEARNING: "bright_yellow",
     "llm": "bright_blue",
     "dim": "dim",
     "header": "bold bright_cyan",
@@ -32,6 +35,9 @@ _BAR_CHARS = {
     EventStatus.SUCCESS: "█",
     EventStatus.ERROR: "█",
     EventStatus.TIMEOUT: "▒",
+    EventStatus.RETRY: "▓",
+    EventStatus.MEMORY_OP: "░",
+    EventStatus.LEARNING: "▒",
     "llm": "░",
     "gap": "░",
 }
@@ -91,6 +97,12 @@ def _build_timeline_bar(
             status_tag = " ✗ ERROR"
         elif child.status == EventStatus.TIMEOUT:
             status_tag = " ⏱ TIMEOUT"
+        elif child.status == EventStatus.RETRY:
+            status_tag = " ↻ RETRY"
+        elif child.status == EventStatus.MEMORY_OP:
+            status_tag = " 🧠 MEMORY"
+        elif child.status == EventStatus.LEARNING:
+            status_tag = " 📖 LEARNING"
 
         label_parts.append(f"{child.name} {_format_duration(child_dur)}{status_tag}")
 
@@ -169,6 +181,17 @@ def render_flamegraph(
     tool_time = _compute_tool_time(trace)
     llm_time = max(0.0, total - tool_time)
 
+    # Count memory and retry events.
+    memory_ops = sum(
+        1 for c in trace.children if c.status == EventStatus.MEMORY_OP
+    )
+    retries = sum(
+        1 for c in trace.children if c.status == EventStatus.RETRY
+    )
+    learnings = sum(
+        1 for c in trace.children if c.status == EventStatus.LEARNING
+    )
+
     # -- Header ----------------------------------------------------------
     header = Text()
     header.append("⚡ AGENTLATCH EXECUTION PROFILE\n", style=_COLORS["header"])
@@ -178,6 +201,16 @@ def render_flamegraph(
         f"LLM Reasoning: {_format_duration(llm_time)}",
         style="bright_white",
     )
+    if memory_ops or retries or learnings:
+        header.append("\n", style="bright_white")
+        parts = []
+        if memory_ops:
+            parts.append(f"Memory: {memory_ops}")
+        if retries:
+            parts.append(f"Retries: {retries}")
+        if learnings:
+            parts.append(f"Learnings: {learnings}")
+        header.append("   " + "  │  ".join(parts), style="bright_white")
 
     con.print()
     con.print(Panel(header, border_style="bright_cyan", padding=(0, 2)))
@@ -221,7 +254,13 @@ def render_flamegraph(
     legend.append("█ ", style=_COLORS[EventStatus.ERROR])
     legend.append("Tool (ERROR)  ", style="dim")
     legend.append("▒ ", style=_COLORS[EventStatus.TIMEOUT])
-    legend.append("Tool (TIMEOUT)", style="dim")
+    legend.append("Tool (TIMEOUT)  ", style="dim")
+    legend.append("▓ ", style=_COLORS[EventStatus.RETRY])
+    legend.append("Retry  ", style="dim")
+    legend.append("░ ", style=_COLORS[EventStatus.MEMORY_OP])
+    legend.append("Memory  ", style="dim")
+    legend.append("▒ ", style=_COLORS[EventStatus.LEARNING])
+    legend.append("Learning", style="dim")
 
     con.print(legend)
     con.print()

@@ -15,6 +15,7 @@ This directory contains the detailed plans, technical decisions, and implementat
 | **[Phase 7](phase_7_sampler.md)** | Response Sampling & Truncation | LLM context conservation & token reduction engine | **✅ Done** |
 | **[Phase 8](phase_8_middleware.md)** | HTTP Server Middleware | Starlette/FastAPI middleware for REST header & body traces | **✅ Done** |
 | **[Phase 9](phase_9_testing.md)** | Comprehensive Testing | Unit and integration testing suite | **✅ Done** |
+| **[Phase 10](phase_10_memory_pipeline.md)** | Memory & Recovery Pipeline | Context-aware memory, intent tagging, and multi-agent DAG support | **✅ Phase A Done** |
 
 ---
 

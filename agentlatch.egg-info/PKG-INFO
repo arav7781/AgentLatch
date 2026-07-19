@@ -177,7 +177,7 @@ uvicorn examples.fastapi_agent:app --reload
 ## Running Tests
 
 ```bash
-uv pip install -e ".[dev,server]"
+uv pip install -e ".[server]"
 pytest tests/ -v
 ```
 

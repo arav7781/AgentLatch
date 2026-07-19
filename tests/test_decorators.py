@@ -96,31 +96,28 @@ class TestSafeToolSync:
 
 
 class TestSafeToolAsync:
-    @pytest.mark.asyncio
-    async def test_async_success(self):
+    def test_async_success(self):
         @safe_tool
         async def async_add(a: int, b: int) -> int:
             return a + b
 
-        assert await async_add(1, 2) == 3
+        assert asyncio.run(async_add(1, 2)) == 3
 
-    @pytest.mark.asyncio
-    async def test_async_catches_exception(self):
+    def test_async_catches_exception(self):
         @safe_tool
         async def async_fail():
             raise KeyError("missing")
 
-        result = await async_fail()
+        result = asyncio.run(async_fail())
         data = json.loads(result)
         assert data["error_type"] == "KeyError"
 
-    @pytest.mark.asyncio
-    async def test_async_timeout(self):
+    def test_async_timeout(self):
         @safe_tool(timeout=0.1)
         async def async_slow():
             await asyncio.sleep(10)
 
-        result = await async_slow()
+        result = asyncio.run(async_slow())
         data = json.loads(result)
         assert data["error_type"] == "TimeoutError"
 
@@ -183,8 +180,7 @@ class TestProfileAgent:
         assert data["status"] == "error"
         assert data["error_type"] == "RuntimeError"
 
-    @pytest.mark.asyncio
-    async def test_async_profile_agent(self):
+    def test_async_profile_agent(self):
         @safe_tool
         async def async_tool():
             return "async_result"
@@ -193,5 +189,5 @@ class TestProfileAgent:
         async def async_agent():
             return await async_tool()
 
-        result = await async_agent()
+        result = asyncio.run(async_agent())
         assert result == "async_result"
