@@ -55,7 +55,7 @@ class TestIntentSync:
         assert get_intent() is None
 
     def test_restores_previous_intent(self):
-        from agentlatch.memory.context import set_intent, reset_intent
+        from agentlatch.memory.context import reset_intent, set_intent
 
         outer_token = set_intent("outer")
 

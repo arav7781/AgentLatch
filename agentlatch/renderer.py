@@ -182,15 +182,9 @@ def render_flamegraph(
     llm_time = max(0.0, total - tool_time)
 
     # Count memory and retry events.
-    memory_ops = sum(
-        1 for c in trace.children if c.status == EventStatus.MEMORY_OP
-    )
-    retries = sum(
-        1 for c in trace.children if c.status == EventStatus.RETRY
-    )
-    learnings = sum(
-        1 for c in trace.children if c.status == EventStatus.LEARNING
-    )
+    memory_ops = sum(1 for c in trace.children if c.status == EventStatus.MEMORY_OP)
+    retries = sum(1 for c in trace.children if c.status == EventStatus.RETRY)
+    learnings = sum(1 for c in trace.children if c.status == EventStatus.LEARNING)
 
     # -- Header ----------------------------------------------------------
     header = Text()

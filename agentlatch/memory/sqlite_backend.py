@@ -230,12 +230,8 @@ class SQLiteBackend(MemoryBackend):
     # ------------------------------------------------------------------
 
     def stats(self) -> dict[str, Any]:
-        snap_count = self._conn.execute(
-            "SELECT COUNT(*) FROM snapshots"
-        ).fetchone()[0]
-        learn_count = self._conn.execute(
-            "SELECT COUNT(*) FROM learnings"
-        ).fetchone()[0]
+        snap_count = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
+        learn_count = self._conn.execute("SELECT COUNT(*) FROM learnings").fetchone()[0]
         return {
             "backend": "sqlite",
             "db_path": self._db_path,

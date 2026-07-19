@@ -38,7 +38,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agentlatch import (
     SQLiteBackend,
     context_aware,
-    init_memory,
     intent,
     profile_agent,
     safe_tool,
@@ -48,7 +47,6 @@ from agentlatch.memory.context import (
     set_agent_id,
     set_node_context,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared State (LangGraph-style)
@@ -192,7 +190,8 @@ def run_leader_agent() -> WorkflowState:
     # === Phase 2: Analysis ===
     print("📊 Phase 2: Analysis")
 
-    from agentlatch.memory.context import reset_node_context, reset_agent_id
+    from agentlatch.memory.context import reset_agent_id, reset_node_context
+
     reset_node_context(node_token)
     reset_agent_id(agent_token)
 
@@ -230,7 +229,7 @@ def run_leader_agent() -> WorkflowState:
 
     report = generate_report(state.analysis[:200])
     state.final_report = report
-    state.messages.append(f"[Writer] Report generated (progressive ref)")
+    state.messages.append("[Writer] Report generated (progressive ref)")
 
     reset_node_context(node_token)
     reset_agent_id(agent_token)

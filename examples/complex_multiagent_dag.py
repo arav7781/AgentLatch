@@ -59,7 +59,9 @@ except ImportError:
         def add_edge(self, start_key: str, end_key: str) -> None:
             self.edges.append((start_key, end_key))
 
-        def add_conditional_edges(self, source: str, router_fn: Any, path_map: dict[str, str]) -> None:
+        def add_conditional_edges(
+            self, source: str, router_fn: Any, path_map: dict[str, str]
+        ) -> None:
             self.conditional_edges[source] = (router_fn, path_map)
 
         def compile(self) -> CompiledGraph:
@@ -132,23 +134,27 @@ class AuditWorkflowState(TypedDict):
 
 # --- Branch A: Research Agent ---
 
+
 @intent("research")
 @context_aware
 @safe_tool
 def fetch_architecture_docs(project: str) -> str:
     """Researcher Sub-Agent: Query knowledge base for security standards."""
     time.sleep(0.18)  # Simulate vector DB lookup
-    return json.dumps({
-        "status": "success",
-        "docs": [
-            "OWASP Top 10 API Security Risks (2026)",
-            "NIST Cybersecurity Framework v2.0 Guidelines",
-            "AgentLatch Context-Aware Memory Propagation Standard",
-        ],
-    })
+    return json.dumps(
+        {
+            "status": "success",
+            "docs": [
+                "OWASP Top 10 API Security Risks (2026)",
+                "NIST Cybersecurity Framework v2.0 Guidelines",
+                "AgentLatch Context-Aware Memory Propagation Standard",
+            ],
+        }
+    )
 
 
 # --- Branch B: Code Audit Agent (With Self-Correction & Delta Updates) ---
+
 
 @intent("code_audit")
 @context_aware(delta=True)
@@ -159,16 +165,23 @@ def run_static_analysis(code: str, attempt: int) -> str:
 
     # Demonstrate @safe_tool failure interception on first attempt
     if "eval(" in code and attempt == 1:
-        raise ValueError("Critical vulnerability: Unsafe eval() statement detected at line 14!")
+        raise ValueError(
+            "Critical vulnerability: Unsafe eval() statement detected at line 14!"
+        )
 
-    return json.dumps({
-        "status": "passed",
-        "issues_found": 1 if "eval(" in code else 0,
-        "vulnerabilities": ["Use of eval() in dynamic code evaluation"] if "eval(" in code else [],
-    })
+    return json.dumps(
+        {
+            "status": "passed",
+            "issues_found": 1 if "eval(" in code else 0,
+            "vulnerabilities": ["Use of eval() in dynamic code evaluation"]
+            if "eval(" in code
+            else [],
+        }
+    )
 
 
 # --- Convergence Node: Security Evaluator ---
+
 
 @intent("security_evaluation")
 @context_aware
@@ -187,7 +200,9 @@ def evaluate_security_risk(state: AuditWorkflowState) -> dict[str, Any]:
     has_vuln = any("eval(" in str(m.get("input_summary")) for m in audit_mems)
 
     score = 0.45 if (has_vuln and not state.get("remediation_applied")) else 0.96
-    print(f"  [Security Evaluator] Memory hits: Research={len(research_mems)}, Audit={len(audit_mems)} | Score: {score}")
+    print(
+        f"  [Security Evaluator] Memory hits: Research={len(research_mems)}, Audit={len(audit_mems)} | Score: {score}"
+    )
 
     return {
         "security_score": score,
@@ -199,6 +214,7 @@ def evaluate_security_risk(state: AuditWorkflowState) -> dict[str, Any]:
 
 # --- Conditional Branch: Remediation Agent ---
 
+
 @intent("remediation")
 @context_aware(delta=True)
 @safe_tool
@@ -206,14 +222,17 @@ def apply_remediation(code: str) -> str:
     """Remediation Sub-Agent: Auto-fix detected code vulnerabilities."""
     time.sleep(0.2)  # Simulate refactoring AST pass
     cleaned_code = code.replace("eval(expr)", "ast.literal_eval(expr)")
-    return json.dumps({
-        "status": "remediated",
-        "original_code": code,
-        "remediated_code": cleaned_code,
-    })
+    return json.dumps(
+        {
+            "status": "remediated",
+            "original_code": code,
+            "remediated_code": cleaned_code,
+        }
+    )
 
 
 # --- Final Convergence: Synthesis & Writer Agent ---
+
 
 @intent("report_synthesis")
 @context_aware(progressive=True)
@@ -225,13 +244,17 @@ def generate_compliance_report(state: AuditWorkflowState) -> str:
     memory = get_memory()
     total_memories = len(memory.query(limit=50)) if memory else 0
 
-    return json.dumps({
-        "report_title": f"Security & Compliance Audit: {state['project_name']}",
-        "final_score": state.get("security_score", 0.0),
-        "remediation_status": "Applied" if state.get("remediation_applied") else "Clean",
-        "total_dag_memories_referenced": total_memories,
-        "summary": "Project successfully audited and certified under NIST CSF v2.0.",
-    })
+    return json.dumps(
+        {
+            "report_title": f"Security & Compliance Audit: {state['project_name']}",
+            "final_score": state.get("security_score", 0.0),
+            "remediation_status": "Applied"
+            if state.get("remediation_applied")
+            else "Clean",
+            "total_dag_memories_referenced": total_memories,
+            "summary": "Project successfully audited and certified under NIST CSF v2.0.",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +293,9 @@ def audit_node_fn(state: AuditWorkflowState) -> dict[str, Any]:
 
     # Handle @safe_tool error output gracefully
     if isinstance(res, str) and '"status": "error"' in res:
-        print("  ⚠️ [Auditor] Tool failed safely (caught by @safe_tool). Self-correcting...")
+        print(
+            "  ⚠️ [Auditor] Tool failed safely (caught by @safe_tool). Self-correcting..."
+        )
         attempt += 1
         res = run_static_analysis(state["code_snippet"], attempt)
 
@@ -346,7 +371,11 @@ def build_complex_dag() -> Any:
 )
 def run_complex_dag() -> AuditWorkflowState:
     """Execute the multi-agent DAG under AgentLatch profiling."""
-    mode = "Official langgraph package" if HAS_LANGGRAPH else "AgentLatch LangGraph mock engine"
+    mode = (
+        "Official langgraph package"
+        if HAS_LANGGRAPH
+        else "AgentLatch LangGraph mock engine"
+    )
     print(f"\n🌐 Executing Complex Multi-Agent DAG ({mode})...\n")
 
     dag = build_complex_dag()

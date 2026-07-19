@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 
 import pytest
 
 from agentlatch.banner import reset_banner
 from agentlatch.decorators import context_aware, profile_agent, safe_tool
 from agentlatch.memory.context import (
-    get_memory,
     init_memory,
     reset_memory_context,
 )
@@ -69,6 +67,7 @@ class TestContextAwareSync:
 
     def test_no_memory_backend_is_harmless(self):
         """context_aware should not crash when no memory is initialized."""
+
         @context_aware
         def no_memory_tool() -> str:
             return "fine"

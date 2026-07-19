@@ -17,6 +17,9 @@ from collections.abc import Callable
 from typing import Any, TypeVar, overload
 
 from agentlatch._types import ErrorPayload, EventStatus
+
+# Re-export memory decorators so users can import from agentlatch.decorators
+from agentlatch.memory.decorators import context_aware, intent  # noqa: F401
 from agentlatch.sampler import sample_response
 from agentlatch.tracker import (
     end_child,
@@ -25,9 +28,6 @@ from agentlatch.tracker import (
     init_trace,
     start_child,
 )
-
-# Re-export memory decorators so users can import from agentlatch.decorators
-from agentlatch.memory.decorators import context_aware, intent  # noqa: F401
 
 F = TypeVar("F", bound=Callable[..., Any])
 

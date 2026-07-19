@@ -54,14 +54,22 @@ class TestSQLiteBackendCRUD:
 
     def test_query_by_intent(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="search", intent="web_search",
-            timestamp=time.time(), status="success",
-        ))
-        backend.store(MemorySnapshot(
-            tool_name="search", intent="db_search",
-            timestamp=time.time(), status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="search",
+                intent="web_search",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
+        backend.store(
+            MemorySnapshot(
+                tool_name="search",
+                intent="db_search",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
 
         web = backend.query(intent="web_search")
         assert len(web) == 1
@@ -72,14 +80,22 @@ class TestSQLiteBackendCRUD:
 
     def test_query_by_node_context(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="tool_a", node_context="retriever_node",
-            timestamp=time.time(), status="success",
-        ))
-        backend.store(MemorySnapshot(
-            tool_name="tool_b", node_context="generator_node",
-            timestamp=time.time(), status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="tool_a",
+                node_context="retriever_node",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
+        backend.store(
+            MemorySnapshot(
+                tool_name="tool_b",
+                node_context="generator_node",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
 
         results = backend.query(node_context="retriever_node")
         assert len(results) == 1
@@ -87,14 +103,22 @@ class TestSQLiteBackendCRUD:
 
     def test_query_by_agent_id(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="tool_x", agent_id="leader",
-            timestamp=time.time(), status="success",
-        ))
-        backend.store(MemorySnapshot(
-            tool_name="tool_y", agent_id="sub_agent_1",
-            timestamp=time.time(), status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="tool_x",
+                agent_id="leader",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
+        backend.store(
+            MemorySnapshot(
+                tool_name="tool_y",
+                agent_id="sub_agent_1",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
 
         results = backend.query(agent_id="leader")
         assert len(results) == 1
@@ -103,22 +127,33 @@ class TestSQLiteBackendCRUD:
     def test_query_limit(self):
         backend = SQLiteBackend()
         for i in range(20):
-            backend.store(MemorySnapshot(
-                tool_name="tool", timestamp=time.time() + i,
-                status="success",
-            ))
+            backend.store(
+                MemorySnapshot(
+                    tool_name="tool",
+                    timestamp=time.time() + i,
+                    status="success",
+                )
+            )
 
         results = backend.query(limit=5)
         assert len(results) == 5
 
     def test_query_order_is_newest_first(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="old", timestamp=100.0, status="success",
-        ))
-        backend.store(MemorySnapshot(
-            tool_name="new", timestamp=200.0, status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="old",
+                timestamp=100.0,
+                status="success",
+            )
+        )
+        backend.store(
+            MemorySnapshot(
+                tool_name="new",
+                timestamp=200.0,
+                status="success",
+            )
+        )
 
         results = backend.query(limit=2)
         assert results[0]["tool_name"] == "new"
@@ -126,14 +161,22 @@ class TestSQLiteBackendCRUD:
 
     def test_get_last_snapshot(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="search", intent="web",
-            timestamp=100.0, status="success",
-        ))
-        backend.store(MemorySnapshot(
-            tool_name="search", intent="web",
-            timestamp=200.0, status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="search",
+                intent="web",
+                timestamp=100.0,
+                status="success",
+            )
+        )
+        backend.store(
+            MemorySnapshot(
+                tool_name="search",
+                intent="web",
+                timestamp=200.0,
+                status="success",
+            )
+        )
 
         last = backend.get_last_snapshot("search", intent="web")
         assert last is not None
@@ -171,11 +214,14 @@ class TestSQLiteBackendLearning:
     def test_multiple_learnings(self):
         backend = SQLiteBackend()
         for i in range(3):
-            backend.store_learning("tool", ToolLearning(
-                tool_name="tool",
-                failure_count=i + 1,
-                timestamp=time.time() + i,
-            ))
+            backend.store_learning(
+                "tool",
+                ToolLearning(
+                    tool_name="tool",
+                    failure_count=i + 1,
+                    timestamp=time.time() + i,
+                ),
+            )
 
         results = backend.get_learnings("tool")
         assert len(results) == 3
@@ -218,9 +264,13 @@ class TestSQLiteBackendDelta:
 class TestSQLiteBackendStats:
     def test_stats(self):
         backend = SQLiteBackend()
-        backend.store(MemorySnapshot(
-            tool_name="t", timestamp=time.time(), status="success",
-        ))
+        backend.store(
+            MemorySnapshot(
+                tool_name="t",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
         stats = backend.stats()
         assert stats["backend"] == "sqlite"
         assert stats["snapshot_count"] == 1
@@ -256,6 +306,7 @@ class TestMemoryContext:
         token = set_intent("database_query")
         assert get_intent() == "database_query"
         from agentlatch.memory.context import reset_intent
+
         reset_intent(token)
         assert get_intent() is None
 
@@ -263,6 +314,7 @@ class TestMemoryContext:
         token = set_node_context("retriever_node")
         assert get_node_context() == "retriever_node"
         from agentlatch.memory.context import reset_node_context
+
         reset_node_context(token)
         assert get_node_context() is None
 
@@ -287,12 +339,20 @@ class TestBackendIsolation:
         backend_a = SQLiteBackend()
         backend_b = SQLiteBackend()
 
-        backend_a.store(MemorySnapshot(
-            tool_name="tool_a", timestamp=time.time(), status="success",
-        ))
-        backend_b.store(MemorySnapshot(
-            tool_name="tool_b", timestamp=time.time(), status="success",
-        ))
+        backend_a.store(
+            MemorySnapshot(
+                tool_name="tool_a",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
+        backend_b.store(
+            MemorySnapshot(
+                tool_name="tool_b",
+                timestamp=time.time(),
+                status="success",
+            )
+        )
 
         assert len(backend_a.query(tool_name="tool_a")) == 1
         assert len(backend_a.query(tool_name="tool_b")) == 0

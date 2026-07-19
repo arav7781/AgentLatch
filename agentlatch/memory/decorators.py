@@ -102,7 +102,6 @@ def intent(tag: str | Callable[..., Any]) -> Callable[[F], F] | Callable[..., An
     # Support @intent (bare — uses function name) and @intent("tag")
     if callable(tag):
         fn = tag
-        tag_str = fn.__name__
         return decorator(fn)  # type: ignore[arg-type]
 
     return decorator  # type: ignore[return-value]
@@ -161,14 +160,16 @@ def context_aware(
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = await fn(*args, **kwargs)
                 _record_snapshot(
-                    fn.__name__, args, kwargs, result,
-                    delta=delta, progressive=progressive,
+                    fn.__name__,
+                    args,
+                    kwargs,
+                    result,
+                    delta=delta,
+                    progressive=progressive,
                     summary_fn=summary_fn,
                 )
                 if progressive:
-                    return _make_progressive_summary(
-                        fn.__name__, result, summary_fn
-                    )
+                    return _make_progressive_summary(fn.__name__, result, summary_fn)
                 return result
 
             return async_wrapper  # type: ignore[return-value]
@@ -179,14 +180,16 @@ def context_aware(
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = fn(*args, **kwargs)
                 _record_snapshot(
-                    fn.__name__, args, kwargs, result,
-                    delta=delta, progressive=progressive,
+                    fn.__name__,
+                    args,
+                    kwargs,
+                    result,
+                    delta=delta,
+                    progressive=progressive,
                     summary_fn=summary_fn,
                 )
                 if progressive:
-                    return _make_progressive_summary(
-                        fn.__name__, result, summary_fn
-                    )
+                    return _make_progressive_summary(fn.__name__, result, summary_fn)
                 return result
 
             return sync_wrapper  # type: ignore[return-value]
@@ -283,9 +286,7 @@ def _record_snapshot(
         # Delta computation.
         delta_data = None
         if delta:
-            previous = memory.get_last_snapshot(
-                tool_name, intent=get_intent()
-            )
+            previous = memory.get_last_snapshot(tool_name, intent=get_intent())
             if previous is not None:
                 delta_data = memory.compute_delta(
                     previous.get("output_summary"), output_summary
@@ -329,15 +330,17 @@ def _make_progressive_summary(
 
     # Default progressive summary.
     if isinstance(result, str):
-        return json.dumps({
-            "_agentlatch_ref": True,
-            "tool": tool_name,
-            "type": "string",
-            "length": len(result),
-            "preview": result[:200] if len(result) > 200 else result,
-            "hint": "Full result stored in AgentLatch memory. "
-                    "Query with intent or tool_name to retrieve.",
-        })
+        return json.dumps(
+            {
+                "_agentlatch_ref": True,
+                "tool": tool_name,
+                "type": "string",
+                "length": len(result),
+                "preview": result[:200] if len(result) > 200 else result,
+                "hint": "Full result stored in AgentLatch memory. "
+                "Query with intent or tool_name to retrieve.",
+            }
+        )
 
     if isinstance(result, dict):
         return {

@@ -24,7 +24,6 @@ from agentlatch import (
     SQLiteBackend,
     context_aware,
     get_memory,
-    init_memory,
     intent,
     profile_agent,
     safe_tool,
@@ -160,7 +159,7 @@ def generate_node(state: AgentState) -> dict[str, Any]:
         f"Final Answer: LangGraph + AgentLatch workflow executed successfully! "
         f"({analysis})"
     )
-    print(f"  [Node: generate] Response generated.")
+    print("  [Node: generate] Response generated.")
     return {"final_answer": final_answer}
 
 
@@ -196,9 +195,15 @@ def create_langgraph_pipeline() -> Any:
     name="LangGraphAgent",
     memory_backend=SQLiteBackend(".langgraph_memory.db"),
 )
-def run_langgraph_agent(query: str = "Explain AgentLatch with LangGraph") -> dict[str, Any]:
+def run_langgraph_agent(
+    query: str = "Explain AgentLatch with LangGraph",
+) -> dict[str, Any]:
     """Execute the compiled LangGraph pipeline wrapped in an AgentLatch profile."""
-    mode = "Official langgraph package" if HAS_LANGGRAPH else "AgentLatch LangGraph mock engine"
+    mode = (
+        "Official langgraph package"
+        if HAS_LANGGRAPH
+        else "AgentLatch LangGraph mock engine"
+    )
     print(f"\n🚀 Running LangGraph Pipeline ({mode})...\n")
 
     pipeline = create_langgraph_pipeline()
