@@ -1,19 +1,12 @@
-"""Multi-agent DAG workflow example — AgentLatch memory with LangGraph-style nodes.
+"""Multi-Agent Leader/Sub-Agent DAG Example — ChatGroq LLM + AgentLatch Memory.
 
 Run:
+    export GROQ_API_KEY="your-groq-api-key"
     python examples/memory_langgraph_agent.py
-
-Demonstrates a **leader/sub-agent** architecture:
-    * A Leader Agent orchestrates three specialist sub-agents.
-    * Each sub-agent has its own tools decorated with @intent, @context_aware,
-      and @safe_tool.
-    * Memory flows across DAG nodes — downstream agents can query upstream
-      results without re-executing.
-    * Delta mode avoids redundant storage when a tool is called repeatedly.
 
 Architecture:
     ┌─────────────────────────────────────────────────────┐
-    │                    Leader Agent                      │
+    │              Leader Agent (ChatGroq)                 │
     │  Orchestrates sub-agents, queries cross-node memory  │
     └──────┬──────────────┬──────────────┬────────────────┘
            │              │              │
@@ -27,6 +20,8 @@ Architecture:
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 import time
 from dataclasses import dataclass, field
@@ -49,7 +44,28 @@ from agentlatch.memory.context import (
 )
 
 # ---------------------------------------------------------------------------
-# Shared State (LangGraph-style)
+# ChatGroq Setup
+# ---------------------------------------------------------------------------
+
+GROQ_KEY = os.environ.get("GROQ_API_KEY")
+
+try:
+    from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_groq import ChatGroq
+
+    HAS_GROQ = bool(GROQ_KEY)
+except ImportError:
+    HAS_GROQ = False
+
+llm = (
+    ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_KEY, temperature=0.2)
+    if HAS_GROQ
+    else None
+)
+
+
+# ---------------------------------------------------------------------------
+# Shared State
 # ---------------------------------------------------------------------------
 
 
@@ -65,7 +81,7 @@ class WorkflowState:
 
 
 # ---------------------------------------------------------------------------
-# Sub-Agent 1: Researcher
+# Sub-Agent Tools
 # ---------------------------------------------------------------------------
 
 
@@ -73,14 +89,25 @@ class WorkflowState:
 @context_aware
 @safe_tool
 def search_documents(query: str) -> str:
-    """Researcher sub-agent: search a document corpus."""
-    time.sleep(0.2)  # Simulate vector DB lookup.
-    return (
-        '{"results": ['
-        '{"doc": "AgentLatch uses contextvars for tracing", "score": 0.95},'
-        '{"doc": "Memory snapshots enable cross-node data sharing", "score": 0.88},'
-        '{"doc": "Delta updates reduce token consumption by 60%", "score": 0.82}'
-        "]}"
+    """Researcher sub-agent tool: search document corpus."""
+    time.sleep(0.18)  # Simulate DB lookup
+    return json.dumps(
+        {
+            "results": [
+                {
+                    "doc": "AgentLatch uses contextvars for trace and memory propagation",
+                    "score": 0.96,
+                },
+                {
+                    "doc": "MemorySnapshots enable cross-node data sharing across sub-agents",
+                    "score": 0.91,
+                },
+                {
+                    "doc": "Delta updates eliminate redundant storage in iterative LLM runs",
+                    "score": 0.85,
+                },
+            ]
+        }
     )
 
 
@@ -88,72 +115,52 @@ def search_documents(query: str) -> str:
 @context_aware
 @safe_tool
 def fetch_external_data(source: str) -> str:
-    """Researcher sub-agent: fetch data from external API."""
-    time.sleep(0.15)  # Simulate API call.
-    return (
-        '{"source": "' + source + '", '
-        '"data": {"users": 1500, "active_today": 342, "growth": "12%"}}'
+    """Researcher sub-agent tool: fetch metric data."""
+    time.sleep(0.15)  # Simulate API lookup
+    return json.dumps(
+        {
+            "source": source,
+            "metrics": {
+                "total_users": 24500,
+                "daily_active": 4120,
+                "growth_rate_pct": 14.5,
+            },
+        }
     )
-
-
-# ---------------------------------------------------------------------------
-# Sub-Agent 2: Analyst
-# ---------------------------------------------------------------------------
 
 
 @intent("analyze")
 @context_aware(delta=True)
 @safe_tool
 def analyze_data(data_summary: str) -> str:
-    """Analyst sub-agent: analyze collected research data."""
-    time.sleep(0.3)  # Simulate LLM analysis.
-    return (
-        '{"insights": ['
-        '"User growth is 12% — above industry average",'
-        '"Document relevance scores are high (>0.8)",'
-        '"Memory system reduces context window usage significantly"'
-        "], "
-        '"confidence": 0.91}'
+    """Analyst sub-agent tool: process research metrics."""
+    time.sleep(0.22)  # Simulate analytical tool execution
+    return json.dumps(
+        {
+            "status": "analyzed",
+            "processed_input_length": len(data_summary),
+            "insights_extracted": 3,
+        }
     )
-
-
-@intent("analyze")
-@context_aware(delta=True)
-@safe_tool
-def validate_findings(findings: str) -> str:
-    """Analyst sub-agent: cross-validate findings."""
-    time.sleep(0.1)  # Simulate validation.
-    return '{"validated": true, "issues": [], "quality_score": 0.94}'
-
-
-# ---------------------------------------------------------------------------
-# Sub-Agent 3: Writer
-# ---------------------------------------------------------------------------
 
 
 @intent("write")
 @context_aware(progressive=True)
 @safe_tool
 def generate_report(context: str) -> str:
-    """Writer sub-agent: generate the final report."""
-    time.sleep(0.25)  # Simulate text generation.
-    return (
-        "# Research Report\n\n"
-        "## Key Findings\n"
-        "- User growth is 12%, above industry average.\n"
-        "- Document relevance scores are consistently high (>0.8).\n"
-        "- The AgentLatch memory system reduces context window usage "
-        "significantly through delta updates.\n\n"
-        "## Recommendations\n"
-        "1. Continue scaling the user base with current growth trajectory.\n"
-        "2. Implement delta-aware caching for repeated tool calls.\n"
-        "3. Enable cross-agent memory sharing for complex DAG workflows.\n\n"
-        "## Confidence: 91%\n"
+    """Writer sub-agent tool: compile executive report."""
+    time.sleep(0.25)  # Simulate formatting tool
+    return json.dumps(
+        {
+            "report_type": "Executive Summary",
+            "context_length": len(context),
+            "status": "ready",
+        }
     )
 
 
 # ---------------------------------------------------------------------------
-# Leader Agent — Orchestrates the DAG
+# Leader Agent & Sub-Agent Execution Nodes
 # ---------------------------------------------------------------------------
 
 
@@ -161,97 +168,143 @@ def generate_report(context: str) -> str:
     name="LeaderAgent",
     memory_backend=SQLiteBackend(".agentlatch_example.db"),
 )
-def run_leader_agent() -> WorkflowState:
-    """Leader agent: orchestrate the multi-agent workflow.
-
-    The leader runs three phases (research → analyze → write),
-    with memory flowing between nodes.
-    """
+def run_leader_agent(
+    user_query: str = "Analyze system performance and agent memory efficiency",
+) -> WorkflowState:
+    """Leader agent orchestrates Researcher, Analyst, and Writer sub-agents using ChatGroq LLM."""
     state = WorkflowState()
     memory = get_memory()
 
-    # === Phase 1: Research ===
-    print("\n🔍 Phase 1: Research")
+    llm_status = (
+        "LIVE ChatGroq (llama-3.3-70b-versatile)"
+        if HAS_GROQ
+        else "Simulated LLM (set GROQ_API_KEY for live ChatGroq)"
+    )
+    print(f"\n⚡ Executing Multi-Agent Leader/Sub-Agent DAG [{llm_status}]\n")
 
-    # Set the node context so memory snapshots are tagged.
+    # === Phase 1: Researcher Sub-Agent ===
+    print("🔍 Phase 1: Researcher Sub-Agent")
     node_token = set_node_context("research_node")
-    agent_token = set_agent_id("researcher")
-    time.sleep(0.1)  # Leader reasoning.
+    agent_token = set_agent_id("researcher_agent")
 
-    # Researcher sub-agent executes its tools.
-    docs = search_documents("agent memory systems")
-    state.messages.append(f"[Researcher] Documents: {docs[:80]}...")
+    raw_docs = search_documents(user_query)
+    ext_data = fetch_external_data("analytics_service")
 
-    ext_data = fetch_external_data("analytics_api")
-    state.messages.append(f"[Researcher] External: {ext_data[:80]}...")
+    if llm:
+        print("  🤖 [Researcher Sub-Agent] Calling ChatGroq LLM...")
+        resp = llm.invoke(
+            [
+                SystemMessage(content="You are a senior technical researcher."),
+                HumanMessage(
+                    content=f"Synthesize research for '{user_query}':\nDocs: {raw_docs}\nMetrics: {ext_data}"
+                ),
+            ]
+        )
+        research_notes = str(resp.content)
+    else:
+        print("  💡 [Researcher Sub-Agent] Synthesizing research outputs...")
+        research_notes = f"Research synthesis for '{user_query}': Growth 14.5%, active users 4,120. Memory propagation verified."
 
-    state.research_data = {"docs": docs, "external": ext_data}
+    state.messages.append(f"[Researcher] Notes: {research_notes[:80]}...")
+    state.research_data = {"notes": research_notes, "raw": raw_docs}
 
-    # === Phase 2: Analysis ===
-    print("📊 Phase 2: Analysis")
-
+    # === Phase 2: Analyst Sub-Agent ===
+    print("\n📊 Phase 2: Analyst Sub-Agent")
     from agentlatch.memory.context import reset_agent_id, reset_node_context
 
     reset_node_context(node_token)
     reset_agent_id(agent_token)
 
     node_token = set_node_context("analysis_node")
-    agent_token = set_agent_id("analyst")
-    time.sleep(0.05)  # Leader reasoning.
+    agent_token = set_agent_id("analyst_agent")
 
-    # Analyst queries upstream memory (research phase results).
+    # Query upstream research memory
     if memory:
-        research_memories = memory.query(intent="research", limit=5)
-        print(f"   📦 Analyst found {len(research_memories)} research memories")
+        upstream_memories = memory.query(intent="research", limit=5)
+        print(
+            f"   📦 Analyst Sub-Agent queried {len(upstream_memories)} upstream research memories from ChatGroq session."
+        )
 
-    analysis = analyze_data(docs[:100])
-    state.messages.append(f"[Analyst] Analysis: {analysis[:80]}...")
+    analyze_data(research_notes[:120])
 
-    validation = validate_findings(analysis[:100])
-    state.messages.append(f"[Analyst] Validation: {validation[:60]}...")
+    if llm:
+        print("  🤖 [Analyst Sub-Agent] Calling ChatGroq LLM...")
+        resp = llm.invoke(
+            [
+                SystemMessage(content="You are a data analyst."),
+                HumanMessage(
+                    content=f"Analyze these research findings and provide strategic implications:\n{research_notes}"
+                ),
+            ]
+        )
+        analysis_out = str(resp.content)
+    else:
+        print("  💡 [Analyst Sub-Agent] Formulating data analysis...")
+        analysis_out = "Analysis: Growth rate of 14.5% is strong. AgentLatch memory reduces token consumption by 60%."
 
-    state.analysis = analysis
+    state.analysis = analysis_out
+    state.messages.append(f"[Analyst] Analysis: {analysis_out[:80]}...")
 
-    # === Phase 3: Writing ===
-    print("✍️  Phase 3: Writing")
-
+    # === Phase 3: Writer Sub-Agent ===
+    print("\n✍️  Phase 3: Writer Sub-Agent")
     reset_node_context(node_token)
     reset_agent_id(agent_token)
 
     node_token = set_node_context("writing_node")
-    agent_token = set_agent_id("writer")
-    time.sleep(0.05)  # Leader reasoning.
+    agent_token = set_agent_id("writer_agent")
 
-    # Writer queries all upstream memory.
     if memory:
         all_memories = memory.query(limit=20)
-        print(f"   📦 Writer has access to {len(all_memories)} total memories")
+        print(
+            f"   📦 Writer Sub-Agent accessed {len(all_memories)} total memories in pipeline."
+        )
 
-    report = generate_report(state.analysis[:200])
-    state.final_report = report
-    state.messages.append("[Writer] Report generated (progressive ref)")
+    generate_report(state.analysis[:150])
+
+    if llm:
+        print("  🤖 [Writer Sub-Agent] Calling ChatGroq LLM...")
+        resp = llm.invoke(
+            [
+                SystemMessage(content="You are a professional technical writer."),
+                HumanMessage(
+                    content=f"Compile a final executive summary report based on:\nAnalysis:\n{state.analysis}"
+                ),
+            ]
+        )
+        final_report = str(resp.content)
+    else:
+        print("  💡 [Writer Sub-Agent] Compiling final executive report...")
+        final_report = (
+            f"# Executive Summary Report\n\n"
+            f"## Key Takeaways\n"
+            f"- User Growth: 14.5%\n"
+            f"- Analysis: {state.analysis[:120]}...\n\n"
+            f"## Conclusion\n"
+            f"Multi-Agent DAG workflow executed successfully with ChatGroq + AgentLatch memory."
+        )
+
+    state.final_report = final_report
+    state.messages.append("[Writer] Report generated (progressive reference stored)")
 
     reset_node_context(node_token)
     reset_agent_id(agent_token)
 
     # === Summary ===
     print("\n" + "=" * 60)
-    print("📋 Workflow Summary")
+    print("📋 Final Executive Briefing (ChatGroq):")
     print("=" * 60)
-    for msg in state.messages:
-        print(f"  → {msg}")
+    print(f"{state.final_report}\n")
 
     if memory:
         stats = memory.stats()
-        print(f"\n  💾 Memory Stats: {stats}")
-        print(f"  📊 Total Snapshots: {stats.get('snapshot_count', 0)}")
+        print(f"💾 Memory Stats: {stats}")
+        print(f"📊 Total Snapshots Recorded: {stats.get('snapshot_count', 0)}\n")
 
-    print()
     return state
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry Point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
