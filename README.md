@@ -306,6 +306,12 @@ python examples/complex_multiagent_dag.py
 export GROQ_API_KEY="your-groq-key"
 python examples/groq_langgraph_agent.py
 
+# ChatGroq + Tavily Multi-Agent Customer Support Bot (requires GROQ_API_KEY & TAVILY_API_KEY)
+export GROQ_API_KEY="your-groq-key"
+export TAVILY_API_KEY="your-tavily-key"
+python examples/groq_customer_support_bot.py
+# (Type 'exit' or press Enter to end session & render the flamegraph report!)
+
 # FastAPI + LangGraph + Groq Agent (requires GROQ_API_KEY)
 export GROQ_API_KEY="your-groq-key"
 uvicorn examples.fastapi_agent:app --reload

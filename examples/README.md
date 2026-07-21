@@ -80,3 +80,72 @@ curl -X POST "http://localhost:8000/chat" \
      -d '{"message": "How many users are in the database?"}'
 ```
 You will receive the structured trace response directly in the response headers and inside the JSON payload under the `_agentlatch` key.
+
+---
+
+## 4. Complex Multi-Agent Customer Support DAG (ChatGroq + Tavily)
+
+* **File**: [`groq_customer_support_bot.py`](groq_customer_support_bot.py)
+* **Description**: Enterprise-grade multi-agent customer support state-machine using `ChatGroq` (`llama-3.1-8b-instant`) as the reasoning engine and `TavilySearchResults` for live web search queries. Zero OpenAI or Anthropic dependencies required.
+* **Architecture**:
+
+```mermaid
+graph TD
+    Start([START]) --> Router[Primary Dispatcher Router Node]
+    
+    Router -- flight_inquiry --> FlightAgent[Flight Specialist Agent]
+    Router -- booking_inquiry --> BookingAgent[Booking Specialist Agent]
+    Router -- policy_inquiry --> PolicyAgent[Policy Compliance Auditor]
+    Router -- web_search --> WebAgent[Web Researcher Agent]
+
+    FlightAgent --> FlightTools[Flight SQLite Tools]
+    FlightTools --> FlightAgent
+    
+    BookingAgent -. queries memory .-> Memory[(AgentLatch Memory)]
+    Memory -. upstream details .-> BookingAgent
+    BookingAgent --> BookingTools[Hotels & Car Rental Tools]
+    BookingTools --> BookingAgent
+    
+    PolicyAgent --> PolicyRetriever[TF-IDF Policy Search]
+    
+    FlightAgent --> End([END])
+    BookingAgent --> End
+    PolicyAgent --> End
+    WebAgent --> End
+
+    classDef nodeStyle fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    class Router,FlightAgent,BookingAgent,PolicyAgent,WebAgent nodeStyle;
+```
+
+* **Key Features Demonstrated**:
+  * **Multi-Agent Specialist Routing**: Central router node classifies user intent and dispatches execution to domain-specific sub-agents (`flight_specialist`, `booking_specialist`, `policy_auditor`, `web_researcher`).
+  * **Cross-Node Memory Intelligence**: The `booking_specialist` node queries upstream AgentLatch memory (`get_memory().query(intent="flight_fetch")`) to discover destination airport and schedule automatically!
+  * **Complete Decorator Stack**:
+    * `@profile_agent(name="GroqComplexSupportBot")`: Traces multi-agent execution timeline, tool latencies, and memory snapshot deltas.
+    * `@safe_tool(timeout=5.0)`: Wraps all domain tools with cross-platform thread timeouts and error conversion.
+    * `@intent(...)`: Indexes tool executions into intent streams for cross-agent querying.
+    * `@context_aware`: Records memory snapshots with `delta=True` (incremental diffs) and `progressive=True` (payload reference summaries).
+  * **Local TF-IDF Policy Search**: Zero-dependency cosine similarity search over Swiss Airlines policy FAQ documents.
+
+```bash
+# 1. Export API Keys
+export GROQ_API_KEY="your-groq-api-key"
+export TAVILY_API_KEY="your-tavily-api-key"
+
+# 2. Run Interactive CLI Mode
+python examples/groq_customer_support_bot.py
+
+# 3. Or Run Single Query Mode
+python examples/groq_customer_support_bot.py "Can you check my current flight details?"
+```
+
+#### Stopping the Session & Viewing the Flamegraph Report
+
+When running in interactive mode (`👤 User: ` prompt):
+* **To stop & view report**: Type `exit` (or `quit`, `q`, `done`) and press **Enter**.
+* **Shortcut**: Press **Enter** on an empty prompt, or press `Ctrl + C` / `Ctrl + D`.
+
+Upon exit, `@profile_agent` automatically finalizes the execution trace and prints the color-coded **ASCII Flamegraph & Memory Summary Table** directly in your terminal screen.
+
+
+

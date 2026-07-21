@@ -155,3 +155,12 @@ Thumbs.db
 
 # Project plans/phases
 
+# SQLite databases and runtime memory stores
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+swiss_faq.md
+
+
