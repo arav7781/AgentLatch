@@ -25,18 +25,15 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import re
 import shutil
 import sqlite3
 import sys
-import time
 from collections import Counter
-from datetime import date, datetime
 from pathlib import Path
-from typing import Annotated, Any, Optional, TypedDict
+from typing import Annotated, Any, TypedDict
 
 import pandas as pd
 import requests
@@ -62,16 +59,22 @@ GROQ_KEY = os.environ.get("GROQ_API_KEY")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY")
 
 try:
-    from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+    from langchain_core.messages import (
+        AnyMessage,
+        HumanMessage,
+        SystemMessage,
+    )
     from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.runnables import Runnable, RunnableConfig
+    from langchain_core.runnables import RunnableConfig
     from langchain_groq import ChatGroq
+
     HAS_GROQ = bool(GROQ_KEY)
 except ImportError:
     HAS_GROQ = False
 
 try:
     from langchain_community.tools import TavilySearchResults
+
     HAS_TAVILY = bool(TAVILY_KEY)
 except ImportError:
     HAS_TAVILY = False
@@ -80,7 +83,7 @@ try:
     from langgraph.checkpoint.memory import MemorySaver
     from langgraph.graph import END, START, StateGraph
     from langgraph.graph.message import add_messages
-    from langgraph.prebuilt import ToolNode, tools_condition
+
     HAS_LANGGRAPH = True
 except ImportError:
     HAS_LANGGRAPH = False
@@ -92,9 +95,12 @@ except ImportError:
 DB_FILE = "travel2.sqlite"
 BACKUP_DB = "travel2.backup.sqlite"
 
+
 def prepare_database(db_path: str = DB_FILE, backup_path: str = BACKUP_DB) -> str:
     """Download SQLite travel DB if missing and update timestamps to relative present."""
-    db_url = "https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite"
+    db_url = (
+        "https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite"
+    )
     if not os.path.exists(db_path):
         print("⏬ Downloading SQLite travel database...")
         res = requests.get(db_url, timeout=30)
@@ -106,24 +112,39 @@ def prepare_database(db_path: str = DB_FILE, backup_path: str = BACKUP_DB) -> st
     # Shift timestamps relative to present
     shutil.copy(backup_path, db_path)
     conn = sqlite3.connect(db_path)
-    tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table';", conn).name.tolist()
+    tables = pd.read_sql(
+        "SELECT name FROM sqlite_master WHERE type='table';", conn
+    ).name.tolist()
     tdf = {t: pd.read_sql(f"SELECT * from {t}", conn) for t in tables}
 
     if "flights" in tdf and not tdf["flights"].empty:
-        example_time = pd.to_datetime(tdf["flights"]["actual_departure"].replace(r"\N", pd.NaT)).max()
+        example_time = pd.to_datetime(
+            tdf["flights"]["actual_departure"].replace(r"\N", pd.NaT)
+        ).max()
         if pd.notnull(example_time):
             current_time = pd.to_datetime("now").tz_localize(example_time.tz)
             time_diff = current_time - example_time
 
             if "bookings" in tdf:
                 tdf["bookings"]["book_date"] = (
-                    pd.to_datetime(tdf["bookings"]["book_date"].replace(r"\N", pd.NaT), utc=True) + time_diff
+                    pd.to_datetime(
+                        tdf["bookings"]["book_date"].replace(r"\N", pd.NaT), utc=True
+                    )
+                    + time_diff
                 )
 
-            datetime_columns = ["scheduled_departure", "scheduled_arrival", "actual_departure", "actual_arrival"]
+            datetime_columns = [
+                "scheduled_departure",
+                "scheduled_arrival",
+                "actual_departure",
+                "actual_arrival",
+            ]
             for col in datetime_columns:
                 if col in tdf["flights"]:
-                    tdf["flights"][col] = pd.to_datetime(tdf["flights"][col].replace(r"\N", pd.NaT)) + time_diff
+                    tdf["flights"][col] = (
+                        pd.to_datetime(tdf["flights"][col].replace(r"\N", pd.NaT))
+                        + time_diff
+                    )
 
             for table_name, df in tdf.items():
                 df.to_sql(table_name, conn, if_exists="replace", index=False)
@@ -142,14 +163,13 @@ class LocalTFIDFRetriever:
         self.doc_vectors: list[dict[int, float]] = []
 
         tokenized_docs = [self._tokenize(doc["page_content"]) for doc in docs]
-        all_words = set(w for tokens in tokenized_docs for w in tokens)
+        all_words = {w for tokens in tokenized_docs for w in tokens}
         self.vocabulary = {word: idx for idx, word in enumerate(sorted(all_words))}
 
         num_docs = len(docs)
         df_counts = Counter(w for tokens in tokenized_docs for w in set(tokens))
         self.idf = {
-            w: math.log((1 + num_docs) / (1 + df_counts[w])) + 1.0
-            for w in all_words
+            w: math.log((1 + num_docs) / (1 + df_counts[w])) + 1.0 for w in all_words
         }
 
         for tokens in tokenized_docs:
@@ -175,7 +195,9 @@ class LocalTFIDFRetriever:
     def _tokenize(self, text: str) -> list[str]:
         return re.findall(r"\b\w+\b", text.lower())
 
-    def _cosine_similarity(self, vec1: dict[int, float], vec2: dict[int, float]) -> float:
+    def _cosine_similarity(
+        self, vec1: dict[int, float], vec2: dict[int, float]
+    ) -> float:
         intersection = set(vec1.keys()) & set(vec2.keys())
         numerator = sum(vec1[x] * vec2[x] for x in intersection)
         sum1 = sum(val**2 for val in vec1.values())
@@ -200,12 +222,15 @@ class LocalTFIDFRetriever:
         return [self.docs[idx]["page_content"] for idx, score in scores[:k]]
 
 
-POLICY_RETRIEVER: Optional[LocalTFIDFRetriever] = None
+POLICY_RETRIEVER: LocalTFIDFRetriever | None = None
+
 
 def get_policy_retriever() -> LocalTFIDFRetriever:
     global POLICY_RETRIEVER
     if POLICY_RETRIEVER is None:
-        url = "https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md"
+        url = (
+            "https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md"
+        )
         POLICY_RETRIEVER = LocalTFIDFRetriever.from_url(url)
     return POLICY_RETRIEVER
 
@@ -214,6 +239,7 @@ def get_policy_retriever() -> LocalTFIDFRetriever:
 # 2. AgentLatch Instrumented Domain Tools
 # ---------------------------------------------------------------------------
 
+
 @intent("policy_lookup")
 @context_aware(progressive=True)
 @safe_tool(timeout=5.0)
@@ -221,7 +247,11 @@ def lookup_policy(query: str) -> str:
     """Consult Swiss Airlines company policy FAQ before performing changes or bookings."""
     retriever = get_policy_retriever()
     results = retriever.query(query, k=2)
-    combined = "\n\n".join(results) if results else "No specific policy document found for query."
+    combined = (
+        "\n\n".join(results)
+        if results
+        else "No specific policy document found for query."
+    )
     if len(combined) > 1500:
         combined = combined[:1500] + "\n... (policy snippet truncated for brevity)"
     return combined
@@ -230,7 +260,9 @@ def lookup_policy(query: str) -> str:
 @intent("flight_fetch")
 @context_aware
 @safe_tool(timeout=5.0)
-def fetch_user_flight_information(passenger_id: str = "3442 587242") -> list[dict[str, Any]]:
+def fetch_user_flight_information(
+    passenger_id: str = "3442 587242",
+) -> list[dict[str, Any]]:
     """Fetch user's booked tickets, flight details, and seat assignments by passenger ID."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -248,15 +280,15 @@ def fetch_user_flight_information(passenger_id: str = "3442 587242") -> list[dic
     rows = cursor.fetchall()
     cols = [col[0] for col in cursor.description]
     conn.close()
-    return [dict(zip(cols, row)) for row in rows]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 @intent("flight_search")
 @context_aware
 @safe_tool(timeout=5.0)
 def search_flights(
-    departure_airport: Optional[str] = None,
-    arrival_airport: Optional[str] = None,
+    departure_airport: str | None = None,
+    arrival_airport: str | None = None,
     limit: int = 5,
 ) -> list[dict[str, Any]]:
     """Search available flights by departure and arrival airports."""
@@ -276,7 +308,7 @@ def search_flights(
     rows = cursor.fetchall()
     cols = [col[0] for col in cursor.description]
     conn.close()
-    return [dict(zip(cols, row)) for row in rows]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 @intent("ticket_update")
@@ -286,11 +318,16 @@ def update_ticket_to_new_flight(ticket_no: str, new_flight_id: int) -> str:
     """Update user's ticket to a new valid flight ID."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT flight_id FROM ticket_flights WHERE ticket_no = ?", (ticket_no,))
+    cursor.execute(
+        "SELECT flight_id FROM ticket_flights WHERE ticket_no = ?", (ticket_no,)
+    )
     if not cursor.fetchone():
         conn.close()
         return f"No ticket found for ticket_no: {ticket_no}"
-    cursor.execute("UPDATE ticket_flights SET flight_id = ? WHERE ticket_no = ?", (new_flight_id, ticket_no))
+    cursor.execute(
+        "UPDATE ticket_flights SET flight_id = ? WHERE ticket_no = ?",
+        (new_flight_id, ticket_no),
+    )
     conn.commit()
     conn.close()
     return f"Ticket {ticket_no} successfully updated to new flight {new_flight_id}."
@@ -312,7 +349,9 @@ def cancel_ticket(ticket_no: str) -> str:
 @intent("hotel_search")
 @context_aware
 @safe_tool(timeout=5.0)
-def search_hotels(location: Optional[str] = None, name: Optional[str] = None) -> list[dict[str, Any]]:
+def search_hotels(
+    location: str | None = None, name: str | None = None
+) -> list[dict[str, Any]]:
     """Search hotel options by location or hotel name."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -328,13 +367,15 @@ def search_hotels(location: Optional[str] = None, name: Optional[str] = None) ->
     rows = cursor.fetchall()
     cols = [col[0] for col in cursor.description]
     conn.close()
-    return [dict(zip(cols, row)) for row in rows]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 @intent("car_search")
 @context_aware
 @safe_tool(timeout=5.0)
-def search_car_rentals(location: Optional[str] = None, name: Optional[str] = None) -> list[dict[str, Any]]:
+def search_car_rentals(
+    location: str | None = None, name: str | None = None
+) -> list[dict[str, Any]]:
     """Search car rental options by location or rental company name."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -350,13 +391,13 @@ def search_car_rentals(location: Optional[str] = None, name: Optional[str] = Non
     rows = cursor.fetchall()
     cols = [col[0] for col in cursor.description]
     conn.close()
-    return [dict(zip(cols, row)) for row in rows]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 @intent("excursion_search")
 @context_aware
 @safe_tool(timeout=5.0)
-def search_trip_recommendations(location: Optional[str] = None) -> list[dict[str, Any]]:
+def search_trip_recommendations(location: str | None = None) -> list[dict[str, Any]]:
     """Search local trip recommendations and excursions."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -369,7 +410,7 @@ def search_trip_recommendations(location: Optional[str] = None) -> list[dict[str
     rows = cursor.fetchall()
     cols = [col[0] for col in cursor.description]
     conn.close()
-    return [dict(zip(cols, row)) for row in rows]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 @intent("web_search")
@@ -385,7 +426,12 @@ def web_search(query: str) -> str:
 
 
 # Tool Registry
-FLIGHT_TOOLS = [fetch_user_flight_information, search_flights, update_ticket_to_new_flight, cancel_ticket]
+FLIGHT_TOOLS = [
+    fetch_user_flight_information,
+    search_flights,
+    update_ticket_to_new_flight,
+    cancel_ticket,
+]
 BOOKING_TOOLS = [search_hotels, search_car_rentals, search_trip_recommendations]
 POLICY_TOOLS = [lookup_policy]
 WEB_TOOLS = [web_search]
@@ -394,12 +440,13 @@ WEB_TOOLS = [web_search]
 # 3. LangGraph Complex Multi-Agent State & Nodes
 # ---------------------------------------------------------------------------
 
+
 class CustomerSupportState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     intent_target: str
-    flight_data: Optional[list[dict[str, Any]]]
-    policy_notes: Optional[str]
-    booking_options: Optional[list[dict[str, Any]]]
+    flight_data: list[dict[str, Any]] | None
+    policy_notes: str | None
+    booking_options: list[dict[str, Any]] | None
     final_output: str
 
 
@@ -417,15 +464,23 @@ def router_node(state: CustomerSupportState) -> dict[str, Any]:
     """Inspect user input and route to specialized sub-agent."""
     set_node_context("router")
     set_agent_id("primary_dispatcher")
-    
+
     last_msg = state["messages"][-1].content if state["messages"] else ""
     text_lower = str(last_msg).lower()
 
-    if any(k in text_lower for k in ["policy", "baggage", "luggage", "rules", "refund", "cancel policy"]):
+    if any(
+        k in text_lower
+        for k in ["policy", "baggage", "luggage", "rules", "refund", "cancel policy"]
+    ):
         target = "policy_auditor"
-    elif any(k in text_lower for k in ["hotel", "car", "rental", "excursion", "tour", "activity", "booking"]):
+    elif any(
+        k in text_lower
+        for k in ["hotel", "car", "rental", "excursion", "tour", "activity", "booking"]
+    ):
         target = "booking_specialist"
-    elif any(k in text_lower for k in ["flight", "ticket", "seat", "departure", "reschedule"]):
+    elif any(
+        k in text_lower for k in ["flight", "ticket", "seat", "departure", "reschedule"]
+    ):
         target = "flight_specialist"
     elif any(k in text_lower for k in ["news", "search", "web", "weather", "status"]):
         target = "web_researcher"
@@ -442,21 +497,27 @@ def route_next_agent(state: CustomerSupportState) -> str:
 
 
 # Node 2: Flight Specialist Node
-def flight_specialist_node(state: CustomerSupportState, config: RunnableConfig) -> dict[str, Any]:
+def flight_specialist_node(
+    state: CustomerSupportState, config: RunnableConfig
+) -> dict[str, Any]:
     """Handles flight retrieval, ticket updates, and scheduling."""
     set_node_context("flight_specialist")
     set_agent_id("flight_agent")
-    
+
     llm = get_groq_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            "You are a Flight Specialist Agent for Swiss Airlines.\n"
-            "Use flight tools to answer queries, check reservations, or search flights.\n"
-            "Passenger ID: {user_info}"
-        ),
-        ("placeholder", "{messages}"),
-    ]).partial(user_info=config.get("configurable", {}).get("passenger_id", "3442 587242"))
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a Flight Specialist Agent for Swiss Airlines.\n"
+                "Use flight tools to answer queries, check reservations, or search flights.\n"
+                "Passenger ID: {user_info}",
+            ),
+            ("placeholder", "{messages}"),
+        ]
+    ).partial(
+        user_info=config.get("configurable", {}).get("passenger_id", "3442 587242")
+    )
 
     runnable = prompt | llm.bind_tools(FLIGHT_TOOLS)
     res = runnable.invoke(state)
@@ -482,7 +543,9 @@ def flight_specialist_node(state: CustomerSupportState, config: RunnableConfig) 
             tool_results.append(out)
 
         # Synthesize final response
-        summary_prompt = f"Summarize flight details clearly for the user: {tool_results}"
+        summary_prompt = (
+            f"Summarize flight details clearly for the user: {tool_results}"
+        )
         final_ai = llm.invoke([HumanMessage(content=summary_prompt)])
         return {"flight_data": tool_results, "messages": [final_ai]}
 
@@ -490,28 +553,40 @@ def flight_specialist_node(state: CustomerSupportState, config: RunnableConfig) 
 
 
 # Node 3: Booking Specialist Node (With Cross-Node AgentLatch Memory Querying!)
-def booking_specialist_node(state: CustomerSupportState, config: RunnableConfig) -> dict[str, Any]:
+def booking_specialist_node(
+    state: CustomerSupportState, config: RunnableConfig
+) -> dict[str, Any]:
     """Handles accommodation and transport reservations, querying upstream flight memory."""
     set_node_context("booking_specialist")
     set_agent_id("booking_agent")
-    
+
     llm = get_groq_llm()
-    
+
     # Query upstream AgentLatch memory for past flight details
     memory = get_memory()
-    past_flight_snapshots = memory.query(intent="flight_fetch", limit=3) if memory else []
-    
+    past_flight_snapshots = (
+        memory.query(intent="flight_fetch", limit=3) if memory else []
+    )
+
     location_hint = "Zurich"  # Default fallback
     if past_flight_snapshots:
-        print(f"  🧠 [Booking Specialist] Retreived {len(past_flight_snapshots)} upstream flight snapshots from AgentLatch Memory!")
+        print(
+            f"  🧠 [Booking Specialist] Retreived {len(past_flight_snapshots)} upstream flight snapshots from AgentLatch Memory!"
+        )
         snap = past_flight_snapshots[0]
-        snapshot_payload = snap.get("output_payload") if isinstance(snap, dict) else getattr(snap, "output_payload", None)
+        snapshot_payload = (
+            snap.get("output_payload")
+            if isinstance(snap, dict)
+            else getattr(snap, "output_payload", None)
+        )
         if isinstance(snapshot_payload, list) and snapshot_payload:
             arrival_ap = snapshot_payload[0].get("arrival_airport")
             if arrival_ap:
                 location_hint = arrival_ap
 
-    print(f"  🏨 [Booking Specialist] Searching hotels & car rentals at location '{location_hint}'...")
+    print(
+        f"  🏨 [Booking Specialist] Searching hotels & car rentals at location '{location_hint}'..."
+    )
     hotels = search_hotels(location=location_hint)
     cars = search_car_rentals(location=location_hint)
 
@@ -530,7 +605,9 @@ def policy_auditor_node(state: CustomerSupportState) -> dict[str, Any]:
     set_node_context("policy_auditor")
     set_agent_id("policy_agent")
 
-    last_user_msg = state["messages"][-1].content if state["messages"] else "baggage allowance"
+    last_user_msg = (
+        state["messages"][-1].content if state["messages"] else "baggage allowance"
+    )
     print(f"  📜 [Policy Auditor] Checking FAQ policies for: '{last_user_msg}'...")
 
     policy_text = lookup_policy(query=str(last_user_msg))
@@ -551,22 +628,31 @@ def web_researcher_node(state: CustomerSupportState) -> dict[str, Any]:
     set_node_context("web_researcher")
     set_agent_id("web_agent")
 
-    last_user_msg = state["messages"][-1].content if state["messages"] else "Swiss Airlines info"
-    print(f"  🌐 [Web Researcher] Executing Tavily web search for: '{last_user_msg}'...")
+    last_user_msg = (
+        state["messages"][-1].content if state["messages"] else "Swiss Airlines info"
+    )
+    print(
+        f"  🌐 [Web Researcher] Executing Tavily web search for: '{last_user_msg}'..."
+    )
 
     search_res = web_search(query=str(last_user_msg))
 
     llm = get_groq_llm()
-    res = llm.invoke([
-        SystemMessage(content="Summarize the web search results accurately."),
-        HumanMessage(content=f"Search Query: {last_user_msg}\nResults: {search_res}")
-    ])
+    res = llm.invoke(
+        [
+            SystemMessage(content="Summarize the web search results accurately."),
+            HumanMessage(
+                content=f"Search Query: {last_user_msg}\nResults: {search_res}"
+            ),
+        ]
+    )
     return {"messages": [res]}
 
 
 # ---------------------------------------------------------------------------
 # 4. Build & Compile Complex LangGraph Workflow
 # ---------------------------------------------------------------------------
+
 
 def create_complex_support_graph() -> Any:
     """Construct multi-agent DAG workflow."""
@@ -612,6 +698,7 @@ def create_complex_support_graph() -> Any:
 # 5. Traced Interactive Execution Entry Point
 # ---------------------------------------------------------------------------
 
+
 @profile_agent(
     name="GroqComplexSupportBot",
     memory_backend=SQLiteBackend(".complex_support_memory.db"),
@@ -620,7 +707,9 @@ def run_groq_complex_support_bot(
     passenger_id: str = "3442 587242",
 ) -> None:
     """Execute complex multi-agent customer support workflow traced by AgentLatch."""
-    print("\n✈️ Initializing Swiss Airlines Complex Multi-Agent Customer Support System...")
+    print(
+        "\n✈️ Initializing Swiss Airlines Complex Multi-Agent Customer Support System..."
+    )
     prepare_database()
 
     graph = create_complex_support_graph()
@@ -635,7 +724,9 @@ def run_groq_complex_support_bot(
     }
 
     print("\n💬 Swiss Airlines Multi-Agent Interactive Terminal")
-    print("   Ask any flight, hotel, policy, or web search query (or type 'exit' to view AgentLatch flamegraph):\n")
+    print(
+        "   Ask any flight, hotel, policy, or web search query (or type 'exit' to view AgentLatch flamegraph):\n"
+    )
 
     # Non-interactive CLI argument execution
     if len(sys.argv) > 1:
@@ -661,7 +752,9 @@ def run_groq_complex_support_bot(
             break
 
         if not user_input or user_input.lower() in ("exit", "quit", "q", "done"):
-            print("\nEnding session. Generating AgentLatch multi-agent flamegraph profile...")
+            print(
+                "\nEnding session. Generating AgentLatch multi-agent flamegraph profile..."
+            )
             break
 
         print("-" * 50)
@@ -671,7 +764,9 @@ def run_groq_complex_support_bot(
     memory = get_memory()
     if memory:
         stats = memory.stats()
-        print(f"\n💾 AgentLatch Multi-Agent Snapshots Recorded: {stats.get('snapshot_count', 0)}\n")
+        print(
+            f"\n💾 AgentLatch Multi-Agent Snapshots Recorded: {stats.get('snapshot_count', 0)}\n"
+        )
 
 
 def _process_multi_agent_query(graph: Any, query: str, config: dict[str, Any]) -> None:
@@ -696,7 +791,11 @@ def _process_multi_agent_query(graph: Any, query: str, config: dict[str, Any]) -
                         print(f"\n🤖 Agent Response:\n{content}\n")
                         last_printed_id = msg_id
                     elif isinstance(content, list) and content:
-                        text_bits = [c.get("text", "") for c in content if isinstance(c, dict) and "text" in c]
+                        text_bits = [
+                            c.get("text", "")
+                            for c in content
+                            if isinstance(c, dict) and "text" in c
+                        ]
                         if text_bits:
                             print(f"\n🤖 Agent Response:\n{' '.join(text_bits)}\n")
                             last_printed_id = msg_id
