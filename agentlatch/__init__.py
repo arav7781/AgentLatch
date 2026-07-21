@@ -41,7 +41,7 @@ from agentlatch.renderer import render_flamegraph
 from agentlatch.sampler import sample_response
 from agentlatch.tracker import TraceEvent, get_trace
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     # Decorators
     "profile_agent",

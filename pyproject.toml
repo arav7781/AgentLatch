@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentlatch"
-version = "0.2.0"
+version = "0.2.1"
 description = "Zero-dependency, terminal-native Python middleware for resilient and observable AI agents."
 readme = "README.md"
 license = {text = "MIT"}
