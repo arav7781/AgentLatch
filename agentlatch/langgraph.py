@@ -11,6 +11,7 @@ import asyncio
 import functools
 import inspect
 import logging
+import re
 import time
 from typing import Any, Callable, TypeVar, overload
 
@@ -63,6 +64,56 @@ def _compute_state_delta(input_state: Any, output_state: Any) -> list[str]:
     return sorted(modified)
 
 
+def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any]]:
+    """Detect tool failures, exceptions, and raw LLM function string hallucinations in output."""
+    errors: list[dict[str, Any]] = []
+
+    # 1. Scan child events (nested tool calls) for errors or timeouts
+    if event:
+        def _scan(ev: TraceEvent) -> None:
+            for child in ev.children:
+                if child.status in (EventStatus.ERROR, EventStatus.TIMEOUT) or child.error_payload:
+                    err_msg = (
+                        child.error_payload.get("message", "")
+                        if child.error_payload
+                        else f"Tool '{child.name}' failed with status {child.status.value}"
+                    )
+                    err_type = (
+                        child.error_payload.get("error_type", "ToolError")
+                        if child.error_payload
+                        else "ToolError"
+                    )
+                    errors.append({
+                        "source": child.name,
+                        "error_type": err_type,
+                        "message": err_msg,
+                    })
+                _scan(child)
+
+        _scan(event)
+
+    # 2. Check state output for raw unparsed LLM function call strings (<function=...)
+    text_content = ""
+    if isinstance(output, dict):
+        msgs = output.get("messages", [])
+        if isinstance(msgs, list) and msgs:
+            last_msg = msgs[-1]
+            text_content = getattr(last_msg, "content", "") or str(last_msg)
+    elif isinstance(output, str):
+        text_content = output
+
+    if isinstance(text_content, str) and ("<function=" in text_content or "</function>" in text_content):
+        func_calls = re.findall(r"<function=([^>]+)>", text_content)
+        sample = func_calls[0] if func_calls else "unknown"
+        errors.append({
+            "source": "llm_output",
+            "error_type": "LLMUnparsedToolCallError",
+            "message": f"LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
+        })
+
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Node Wrapper Function
 # ---------------------------------------------------------------------------
@@ -98,20 +149,28 @@ def wrap_state_node(node_name: str, node_fn: Callable[..., Any]) -> Callable[...
                     else input_keys
                 )
 
+                detected_errors = _inspect_errors(output_state, event)
+                final_status = (
+                    EventStatus.ERROR if detected_errors else EventStatus.STATE_NODE
+                )
+                err_payload = detected_errors[0] if detected_errors else None
+
                 if event:
                     end_child(
                         event,
-                        status=EventStatus.STATE_NODE,
+                        status=final_status,
+                        error_payload=err_payload,
                         metadata={
                             "input_keys": input_keys,
                             "output_keys": output_keys,
                             "delta_keys": delta_keys,
+                            "errors": [e["message"] for e in detected_errors],
                         },
                     )
 
                 logger.debug(
                     f"[AgentLatch LangGraph] State Node '{node_name}' completed "
-                    f"in {event.duration_ms:.2f}ms | Deltas: {delta_keys}"
+                    f"in {event.duration_ms:.2f}ms | Deltas: {delta_keys} | Errors: {len(detected_errors)}"
                     if event
                     else f"[AgentLatch LangGraph] State Node '{node_name}' completed."
                 )
@@ -160,20 +219,28 @@ def wrap_state_node(node_name: str, node_fn: Callable[..., Any]) -> Callable[...
                     else input_keys
                 )
 
+                detected_errors = _inspect_errors(output_state, event)
+                final_status = (
+                    EventStatus.ERROR if detected_errors else EventStatus.STATE_NODE
+                )
+                err_payload = detected_errors[0] if detected_errors else None
+
                 if event:
                     end_child(
                         event,
-                        status=EventStatus.STATE_NODE,
+                        status=final_status,
+                        error_payload=err_payload,
                         metadata={
                             "input_keys": input_keys,
                             "output_keys": output_keys,
                             "delta_keys": delta_keys,
+                            "errors": [e["message"] for e in detected_errors],
                         },
                     )
 
                 logger.debug(
                     f"[AgentLatch LangGraph] State Node '{node_name}' completed "
-                    f"in {event.duration_ms:.2f}ms | Deltas: {delta_keys}"
+                    f"in {event.duration_ms:.2f}ms | Deltas: {delta_keys} | Errors: {len(detected_errors)}"
                     if event
                     else f"[AgentLatch LangGraph] State Node '{node_name}' completed."
                 )
@@ -330,6 +397,13 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
         )
         prev_node = node_name
 
+        # Collect errors for this node event
+        node_err_list = ev.metadata.get("errors", [])
+        if ev.error_payload:
+            msg = f"{ev.error_payload.get('error_type', 'Error')}: {ev.error_payload.get('message', '')}"
+            if msg not in node_err_list:
+                node_err_list = list(node_err_list) + [msg]
+
         # State log entry
         state_logs.append(
             {
@@ -342,6 +416,8 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
                 "state_input_keys": ev.metadata.get("input_keys", []),
                 "state_output_keys": ev.metadata.get("output_keys", []),
                 "delta_keys": ev.metadata.get("delta_keys", []),
+                "errors_count": len(node_err_list),
+                "error_details": node_err_list,
             }
         )
 
@@ -367,8 +443,16 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
         percentage = (total_dur / total_graph_dur * 100.0) if total_graph_dur > 0 else 0.0
 
         all_deltas: set[str] = set()
+        all_errors: list[str] = []
         for e in events:
             all_deltas.update(e.metadata.get("delta_keys", []))
+            for err in e.metadata.get("errors", []):
+                if err not in all_errors:
+                    all_errors.append(err)
+            if e.error_payload:
+                msg = f"{e.error_payload.get('error_type', 'Error')}: {e.error_payload.get('message', '')}"
+                if msg not in all_errors:
+                    all_errors.append(msg)
 
         per_state_metrics[node_name] = {
             "count": count,
@@ -378,6 +462,8 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
             "max_duration_sec": round(max_dur, 6),
             "percentage_of_graph": round(percentage, 2),
             "state_keys_modified": sorted(list(all_deltas)),
+            "errors_count": len(all_errors),
+            "error_details": all_errors,
         }
 
     return {
@@ -426,19 +512,31 @@ def log_state_execution(
 
     if print_console:
         print(f"\n⚡ AgentLatch LangGraph State Breakdown [{metrics['graph_name']}]")
-        print("─" * 70)
-        print(f"{'State Node':<20} {'Count':<8} {'Total (ms)':<12} {'Avg (ms)':<12} {'Graph %':<10}")
-        print("─" * 70)
+        print("─" * 80)
+        print(f"{'State Node':<20} {'Count':<8} {'Total (ms)':<12} {'Avg (ms)':<12} {'Graph %':<10} {'Errors':<10}")
+        print("─" * 80)
         for node_name, stat in metrics["per_state_metrics"].items():
             pct_str = f"{stat['percentage_of_graph']:.1f}%"
+            err_str = f"{stat['errors_count']} ERR" if stat.get("errors_count", 0) > 0 else "0"
             print(
                 f"{node_name:<20} "
                 f"{stat['count']:<8} "
                 f"{stat['total_duration_sec'] * 1000:<12.2f} "
                 f"{stat['avg_duration_sec'] * 1000:<12.2f} "
-                f"{pct_str:<10}"
+                f"{pct_str:<10} "
+                f"{err_str:<10}"
             )
-        print("─" * 70)
+        print("─" * 80)
         if metrics["transitions"]:
             seq = " ➔ ".join(t["from_state"] for t in metrics["transitions"]) + f" ➔ {metrics['transitions'][-1]['to_state']}"
-            print(f"🔄 State Trajectory: {seq}\n")
+            print(f"🔄 State Trajectory: {seq}")
+
+        # Print detailed error messages if any errors occurred
+        has_any_errors = any(s.get("errors_count", 0) > 0 for s in metrics["per_state_metrics"].values())
+        if has_any_errors:
+            print("\n⚠️  State Node Errors Detected:")
+            for node_name, stat in metrics["per_state_metrics"].items():
+                if stat.get("errors_count", 0) > 0:
+                    for err in stat.get("error_details", []):
+                        print(f"   • [{node_name}] {err}")
+        print()

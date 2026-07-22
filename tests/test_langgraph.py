@@ -174,3 +174,25 @@ def test_log_state_execution(capsys):
     assert "node_a" in captured.out
     assert "node_b" in captured.out
     assert "State Trajectory: START ➔ node_a ➔ node_b ➔ END" in captured.out
+
+
+def test_unparsed_llm_function_error_detection():
+    """Test that LLM unparsed raw function call strings (<function=...) are detected as errors."""
+
+    @profile_agent(name="HallucinationAgent")
+    def run():
+        def buggy_llm_node(state: StateSchema) -> dict:
+            return {
+                "messages": [
+                    "<function=search_flights>{\"airport\": \"BLR\"}</function>"
+                ]
+            }
+
+        wrapped = wrap_state_node("flight_specialist", buggy_llm_node)
+        wrapped({"query": "book flight"})
+
+        metrics = calculate_state_execution()
+        assert metrics["per_state_metrics"]["flight_specialist"]["errors_count"] == 1
+        assert "LLMUnparsedToolCallError" in metrics["per_state_metrics"]["flight_specialist"]["error_details"][0]
+
+    run()

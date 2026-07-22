@@ -132,7 +132,7 @@ def _compute_tool_time(trace: TraceEvent) -> float:
 
 
 def _build_summary_table(trace: TraceEvent) -> Table:
-    """Rich table with per-tool breakdown."""
+    """Rich table with per-tool and per-state node breakdown, including nested tool calls and errors."""
     table = Table(
         show_header=True,
         header_style="bold bright_white",
@@ -145,25 +145,34 @@ def _build_summary_table(trace: TraceEvent) -> Table:
     table.add_column("Status", justify="center", ratio=1)
     table.add_column("Details", style="dim", ratio=3)
 
-    for child in trace.children:
-        status_style = _COLORS.get(child.status, "white")
-        status_text = Text(child.status.value.upper(), style=status_style)
+    def _add_event_row(ev: TraceEvent, indent_level: int = 0) -> None:
+        prefix = "  " * indent_level + ("└─ " if indent_level > 0 else "")
+        status_style = _COLORS.get(ev.status, "white")
+        status_text = Text(ev.status.value.upper(), style=status_style)
 
         details_info = ""
-        if child.error_payload:
-            details_info = (
-                f"{child.error_payload.get('error_type', '?')}: "
-                f"{child.error_payload.get('message', '')}"
-            )
-        elif child.metadata and "delta_keys" in child.metadata:
-            details_info = f"Deltas: {child.metadata.get('delta_keys', [])}"
+        if ev.error_payload:
+            err_type = ev.error_payload.get("error_type", "Error")
+            err_msg = ev.error_payload.get("message", "")
+            details_info = f"❌ {err_type}: {err_msg}"
+        elif ev.metadata and "errors" in ev.metadata and ev.metadata["errors"]:
+            details_info = f"❌ Errors: {ev.metadata['errors'][0]}"
+        elif ev.metadata and "delta_keys" in ev.metadata:
+            details_info = f"Deltas: {ev.metadata.get('delta_keys', [])}"
 
         table.add_row(
-            child.name,
-            _format_duration(child.duration),
+            prefix + ev.name,
+            _format_duration(ev.duration),
             status_text,
             details_info,
         )
+
+        # Recursively render nested child tool calls / memory operations
+        for child in ev.children:
+            _add_event_row(child, indent_level + 1)
+
+    for child in trace.children:
+        _add_event_row(child, indent_level=0)
 
     return table
 

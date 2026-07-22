@@ -37,6 +37,8 @@ class PerStateMetric(TypedDict):
     max_duration_sec: float
     percentage_of_graph: float
     state_keys_modified: list[str]
+    errors_count: int
+    error_details: list[str]
 
 
 class StateTransition(TypedDict):
@@ -60,6 +62,8 @@ class StateNodeLog(TypedDict):
     state_input_keys: list[str]
     state_output_keys: list[str]
     delta_keys: list[str]
+    errors_count: int
+    error_details: list[str]
 
 
 class StateExecutionMetrics(TypedDict):
