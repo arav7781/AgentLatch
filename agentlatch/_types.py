@@ -5,6 +5,8 @@ from __future__ import annotations
 import enum
 from typing import Any, TypeAlias, TypedDict
 
+__version__ = "0.2.1"
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -75,7 +77,6 @@ class StateExecutionMetrics(TypedDict):
     per_state_metrics: dict[str, PerStateMetric]
     transitions: list[StateTransition]
     state_logs: list[StateNodeLog]
-
 
 
 # ---------------------------------------------------------------------------

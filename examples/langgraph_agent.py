@@ -22,11 +22,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agentlatch import (
     SQLiteBackend,
+    calculate_state_execution,
     context_aware,
     get_memory,
     intent,
+    log_state_execution,
     profile_agent,
     safe_tool,
+    wrap_langgraph,
 )
 from agentlatch.memory.context import set_agent_id, set_node_context
 
@@ -166,20 +169,6 @@ def generate_node(state: AgentState) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # 3. Build & Compile LangGraph StateGraph
 # ---------------------------------------------------------------------------
-
-
-from agentlatch import (
-    SQLiteBackend,
-    calculate_state_execution,
-    context_aware,
-    get_memory,
-    intent,
-    log_state_execution,
-    profile_agent,
-    safe_tool,
-    wrap_langgraph,
-)
-from agentlatch.memory.context import set_agent_id, set_node_context
 
 
 def create_langgraph_pipeline() -> Any:

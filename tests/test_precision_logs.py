@@ -14,7 +14,9 @@ def setup_function():
 
 def test_trace_event_precision_timestamps():
     """Test high-precision epoch, ISO, ms, and us properties of TraceEvent."""
-    event = TraceEvent(name="test_event", start_time=time.monotonic(), start_timestamp=time.time())
+    event = TraceEvent(
+        name="test_event", start_time=time.monotonic(), start_timestamp=time.time()
+    )
     time.sleep(0.012)
     event.end_time = time.monotonic()
     event.end_timestamp = time.time()

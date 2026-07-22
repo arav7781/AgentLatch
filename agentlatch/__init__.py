@@ -29,6 +29,7 @@ For memory-aware workflows::
         ...
 """
 
+from agentlatch._types import __version__
 from agentlatch.config import is_dev_mode, set_dev_mode
 from agentlatch.decorators import context_aware, intent, profile_agent, safe_tool
 from agentlatch.langgraph import (
@@ -47,7 +48,6 @@ from agentlatch.renderer import render_flamegraph
 from agentlatch.sampler import sample_response
 from agentlatch.tracker import TraceEvent, get_trace
 
-__version__ = "0.2.1"
 __all__ = [
     # Decorators
     "profile_agent",

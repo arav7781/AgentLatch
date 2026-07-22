@@ -7,13 +7,13 @@ delta tracking, transition analysis, and performance metrics calculation.
 
 from __future__ import annotations
 
-import asyncio
 import functools
 import inspect
 import logging
 import re
 import time
-from typing import Any, Callable, TypeVar, overload
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from agentlatch._types import (
     EventStatus,
@@ -27,7 +27,6 @@ from agentlatch.tracker import (
     TraceEvent,
     end_child,
     get_trace,
-    init_trace,
     start_child,
 )
 
@@ -44,9 +43,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 def _extract_state_keys(state: Any) -> list[str]:
     """Extract dictionary keys from a LangGraph state object or return [] if not dict-like."""
     if isinstance(state, dict):
-        return sorted(list(state.keys()))
+        return sorted(state.keys())
     if hasattr(state, "__dict__"):
-        return sorted(list(getattr(state, "__dict__").keys()))
+        return sorted(state.__dict__.keys())
     return []
 
 
@@ -54,7 +53,7 @@ def _compute_state_delta(input_state: Any, output_state: Any) -> list[str]:
     """Identify keys added or modified between input and output state snapshots."""
     if not isinstance(input_state, dict) or not isinstance(output_state, dict):
         if isinstance(output_state, dict):
-            return sorted(list(output_state.keys()))
+            return sorted(output_state.keys())
         return []
 
     modified: list[str] = []
@@ -70,9 +69,13 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
 
     # 1. Scan child events (nested tool calls) for errors or timeouts
     if event:
+
         def _scan(ev: TraceEvent) -> None:
             for child in ev.children:
-                if child.status in (EventStatus.ERROR, EventStatus.TIMEOUT) or child.error_payload:
+                if (
+                    child.status in (EventStatus.ERROR, EventStatus.TIMEOUT)
+                    or child.error_payload
+                ):
                     err_msg = (
                         child.error_payload.get("message", "")
                         if child.error_payload
@@ -83,11 +86,13 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
                         if child.error_payload
                         else "ToolError"
                     )
-                    errors.append({
-                        "source": child.name,
-                        "error_type": err_type,
-                        "message": err_msg,
-                    })
+                    errors.append(
+                        {
+                            "source": child.name,
+                            "error_type": err_type,
+                            "message": err_msg,
+                        }
+                    )
                 _scan(child)
 
         _scan(event)
@@ -102,14 +107,18 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
     elif isinstance(output, str):
         text_content = output
 
-    if isinstance(text_content, str) and ("<function=" in text_content or "</function>" in text_content):
+    if isinstance(text_content, str) and (
+        "<function=" in text_content or "</function>" in text_content
+    ):
         func_calls = re.findall(r"<function=([^>]+)>", text_content)
         sample = func_calls[0] if func_calls else "unknown"
-        errors.append({
-            "source": "llm_output",
-            "error_type": "LLMUnparsedToolCallError",
-            "message": f"LLMUnparsedToolCallError: LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
-        })
+        errors.append(
+            {
+                "source": "llm_output",
+                "error_type": "LLMUnparsedToolCallError",
+                "message": f"LLMUnparsedToolCallError: LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
+            }
+        )
 
     return errors
 
@@ -125,7 +134,7 @@ def wrap_state_node(node_name: str, node_fn: Callable[..., Any]) -> Callable[...
 
         @functools.wraps(node_fn)
         async def async_node_wrapper(state: Any, *args: Any, **kwargs: Any) -> Any:
-            token = set_node_context(node_name)
+            set_node_context(node_name)
             input_keys = _extract_state_keys(state)
             trace_active = get_trace() is not None
 
@@ -195,7 +204,7 @@ def wrap_state_node(node_name: str, node_fn: Callable[..., Any]) -> Callable[...
 
         @functools.wraps(node_fn)
         def sync_node_wrapper(state: Any, *args: Any, **kwargs: Any) -> Any:
-            token = set_node_context(node_name)
+            set_node_context(node_name)
             input_keys = _extract_state_keys(state)
             trace_active = get_trace() is not None
 
@@ -295,7 +304,7 @@ def wrap_langgraph(graph: Any) -> Any:
             for name, fn in list(graph.nodes.items()):
                 if not getattr(fn, "_agentlatch_wrapped", False):
                     wrapped = wrap_state_node(name, fn)
-                    setattr(wrapped, "_agentlatch_wrapped", True)
+                    wrapped._agentlatch_wrapped = True
                     graph.nodes[name] = wrapped
 
         original_compile = getattr(graph, "compile", None)
@@ -312,25 +321,29 @@ def wrap_langgraph(graph: Any) -> Any:
         for name, node in list(graph.nodes.items()):
             # 1) Official langgraph PregelNode with bound.func / bound.afunc
             if hasattr(node, "bound"):
-                bound = getattr(node, "bound")
-                target_attr = "func" if hasattr(bound, "func") else ("afunc" if hasattr(bound, "afunc") else None)
+                bound = node.bound
+                target_attr = (
+                    "func"
+                    if hasattr(bound, "func")
+                    else ("afunc" if hasattr(bound, "afunc") else None)
+                )
                 if target_attr and callable(getattr(bound, target_attr)):
                     orig_fn = getattr(bound, target_attr)
                     if not getattr(orig_fn, "_agentlatch_wrapped", False):
                         wrapped_fn = wrap_state_node(name, orig_fn)
-                        setattr(wrapped_fn, "_agentlatch_wrapped", True)
+                        wrapped_fn._agentlatch_wrapped = True
                         setattr(bound, target_attr, wrapped_fn)
             # 2) Objects with runnable attribute
-            elif hasattr(node, "runnable") and callable(getattr(node, "runnable")):
-                orig_fn = getattr(node, "runnable")
+            elif hasattr(node, "runnable") and callable(node.runnable):
+                orig_fn = node.runnable
                 if not getattr(orig_fn, "_agentlatch_wrapped", False):
                     wrapped_fn = wrap_state_node(name, orig_fn)
-                    setattr(wrapped_fn, "_agentlatch_wrapped", True)
+                    wrapped_fn._agentlatch_wrapped = True
                     node.runnable = wrapped_fn
             # 3) Direct callables (e.g. MockStateGraph)
             elif callable(node) and not getattr(node, "_agentlatch_wrapped", False):
                 wrapped_fn = wrap_state_node(name, node)
-                setattr(wrapped_fn, "_agentlatch_wrapped", True)
+                wrapped_fn._agentlatch_wrapped = True
                 graph.nodes[name] = wrapped_fn
 
     return graph
@@ -363,7 +376,9 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
     state_events: list[TraceEvent] = []
 
     def _collect_state_nodes(event: TraceEvent) -> None:
-        if event.status == EventStatus.STATE_NODE or event.metadata.get("is_state_node"):
+        if event.status == EventStatus.STATE_NODE or event.metadata.get(
+            "is_state_node"
+        ):
             state_events.append(event)
         for child in event.children:
             _collect_state_nodes(child)
@@ -440,7 +455,9 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
         avg_dur = total_dur / count if count > 0 else 0.0
         min_dur = min(durations) if durations else 0.0
         max_dur = max(durations) if durations else 0.0
-        percentage = (total_dur / total_graph_dur * 100.0) if total_graph_dur > 0 else 0.0
+        percentage = (
+            (total_dur / total_graph_dur * 100.0) if total_graph_dur > 0 else 0.0
+        )
 
         all_deltas: set[str] = set()
         all_errors: list[str] = []
@@ -452,7 +469,9 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
             if e.error_payload:
                 msg = e.error_payload.get("message", "")
                 err_type = e.error_payload.get("error_type", "Error")
-                fmt = f"{err_type}: {msg}" if (err_type and err_type not in msg) else msg
+                fmt = (
+                    f"{err_type}: {msg}" if (err_type and err_type not in msg) else msg
+                )
                 if fmt not in all_errors and msg not in all_errors:
                     all_errors.append(fmt)
 
@@ -463,7 +482,7 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
             "min_duration_sec": round(min_dur, 6),
             "max_duration_sec": round(max_dur, 6),
             "percentage_of_graph": round(percentage, 2),
-            "state_keys_modified": sorted(list(all_deltas)),
+            "state_keys_modified": sorted(all_deltas),
             "errors_count": len(all_errors),
             "error_details": all_errors,
         }
@@ -515,11 +534,17 @@ def log_state_execution(
     if print_console:
         print(f"\n⚡ AgentLatch LangGraph State Breakdown [{metrics['graph_name']}]")
         print("─" * 80)
-        print(f"{'State Node':<20} {'Count':<8} {'Total (ms)':<12} {'Avg (ms)':<12} {'Graph %':<10} {'Errors':<10}")
+        print(
+            f"{'State Node':<20} {'Count':<8} {'Total (ms)':<12} {'Avg (ms)':<12} {'Graph %':<10} {'Errors':<10}"
+        )
         print("─" * 80)
         for node_name, stat in metrics["per_state_metrics"].items():
             pct_str = f"{stat['percentage_of_graph']:.1f}%"
-            err_str = f"{stat['errors_count']} ERR" if stat.get("errors_count", 0) > 0 else "0"
+            err_str = (
+                f"{stat['errors_count']} ERR"
+                if stat.get("errors_count", 0) > 0
+                else "0"
+            )
             print(
                 f"{node_name:<20} "
                 f"{stat['count']:<8} "
@@ -530,11 +555,16 @@ def log_state_execution(
             )
         print("─" * 80)
         if metrics["transitions"]:
-            seq = " ➔ ".join(t["from_state"] for t in metrics["transitions"]) + f" ➔ {metrics['transitions'][-1]['to_state']}"
+            seq = (
+                " ➔ ".join(t["from_state"] for t in metrics["transitions"])
+                + f" ➔ {metrics['transitions'][-1]['to_state']}"
+            )
             print(f"🔄 State Trajectory: {seq}")
 
         # Print detailed error messages if any errors occurred
-        has_any_errors = any(s.get("errors_count", 0) > 0 for s in metrics["per_state_metrics"].values())
+        has_any_errors = any(
+            s.get("errors_count", 0) > 0 for s in metrics["per_state_metrics"].values()
+        )
         if has_any_errors:
             print("\n⚠️  State Node Errors Detected:")
             for node_name, stat in metrics["per_state_metrics"].items():

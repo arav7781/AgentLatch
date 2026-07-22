@@ -6,8 +6,6 @@ import asyncio
 import time
 from typing import TypedDict
 
-import pytest
-
 from agentlatch import (
     calculate_state_execution,
     get_trace,
@@ -91,7 +89,7 @@ def test_wrap_langgraph_mock_graph():
 
         def invoke(self, input_state):
             state = dict(input_state)
-            for name, action in self.nodes.items():
+            for _name, action in self.nodes.items():
                 res = action(state)
                 if isinstance(res, dict):
                     state.update(res)
@@ -115,8 +113,12 @@ def test_wrap_langgraph_mock_graph():
         assert "step2" in metrics["per_state_metrics"]
         assert metrics["per_state_metrics"]["step1"]["count"] == 1
         assert metrics["per_state_metrics"]["step2"]["count"] == 1
-        assert metrics["per_state_metrics"]["step1"]["state_keys_modified"] == ["documents"]
-        assert metrics["per_state_metrics"]["step2"]["state_keys_modified"] == ["analysis"]
+        assert metrics["per_state_metrics"]["step1"]["state_keys_modified"] == [
+            "documents"
+        ]
+        assert metrics["per_state_metrics"]["step2"]["state_keys_modified"] == [
+            "analysis"
+        ]
         assert len(metrics["transitions"]) == 3  # START -> step1 -> step2 -> END
 
     run_pipeline()
@@ -149,9 +151,24 @@ def test_log_state_execution(capsys):
             },
         },
         "transitions": [
-            {"from_state": "START", "to_state": "node_a", "duration_sec": 0.02, "timestamp_iso": "2026-07-22T00:00:00.000Z"},
-            {"from_state": "node_a", "to_state": "node_b", "duration_sec": 0.03, "timestamp_iso": "2026-07-22T00:00:00.020Z"},
-            {"from_state": "node_b", "to_state": "END", "duration_sec": 0.0, "timestamp_iso": "2026-07-22T00:00:00.050Z"},
+            {
+                "from_state": "START",
+                "to_state": "node_a",
+                "duration_sec": 0.02,
+                "timestamp_iso": "2026-07-22T00:00:00.000Z",
+            },
+            {
+                "from_state": "node_a",
+                "to_state": "node_b",
+                "duration_sec": 0.03,
+                "timestamp_iso": "2026-07-22T00:00:00.020Z",
+            },
+            {
+                "from_state": "node_b",
+                "to_state": "END",
+                "duration_sec": 0.0,
+                "timestamp_iso": "2026-07-22T00:00:00.050Z",
+            },
         ],
         "state_logs": [
             {
@@ -183,9 +200,7 @@ def test_unparsed_llm_function_error_detection():
     def run():
         def buggy_llm_node(state: StateSchema) -> dict:
             return {
-                "messages": [
-                    "<function=search_flights>{\"airport\": \"BLR\"}</function>"
-                ]
+                "messages": ['<function=search_flights>{"airport": "BLR"}</function>']
             }
 
         wrapped = wrap_state_node("flight_specialist", buggy_llm_node)
@@ -193,6 +208,9 @@ def test_unparsed_llm_function_error_detection():
 
         metrics = calculate_state_execution()
         assert metrics["per_state_metrics"]["flight_specialist"]["errors_count"] == 1
-        assert "LLMUnparsedToolCallError" in metrics["per_state_metrics"]["flight_specialist"]["error_details"][0]
+        assert (
+            "LLMUnparsedToolCallError"
+            in metrics["per_state_metrics"]["flight_specialist"]["error_details"][0]
+        )
 
     run()

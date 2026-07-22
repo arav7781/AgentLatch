@@ -19,6 +19,8 @@ from rich.console import Console
 from rich.live import Live
 from rich.text import Text
 
+from agentlatch._types import __version__
+
 # ---------------------------------------------------------------------------
 # Block Letter Definitions  (each char is exactly 6 columns wide)
 # ---------------------------------------------------------------------------
@@ -73,8 +75,6 @@ _ATMOS_BOTTOM: list[str] = [
 _ART_LINES: list[str] = (
     _ATMOS_TOP + _AGENT_LINES + _DIVIDER + _LATCH_LINES + _ATMOS_BOTTOM
 )
-
-from agentlatch import __version__
 
 # Pre-compute which rows are ASCII-art text (not atmosphere).
 _TEXT_ROW_START = len(_ATMOS_TOP)

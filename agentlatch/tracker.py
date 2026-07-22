@@ -7,8 +7,8 @@ developers never need to thread a ``trace_id`` through their function calls.
 from __future__ import annotations
 
 import contextvars
-import time
 import datetime
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
