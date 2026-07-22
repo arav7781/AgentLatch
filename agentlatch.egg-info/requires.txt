@@ -2,8 +2,23 @@ rich>=13.0
 pytest>=7.0
 pytest-asyncio>=0.21
 
+[all-memory]
+agentlatch[vector]
+agentlatch[qdrant]
+agentlatch[graph]
+
 [dev]
+
+[graph]
+neo4j>=5.0
+
+[qdrant]
+qdrant-client>=1.7
 
 [server]
 starlette>=0.27
 httpx>=0.24
+
+[vector]
+psycopg[binary]>=3.1
+pgvector>=0.2
