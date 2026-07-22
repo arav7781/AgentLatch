@@ -43,11 +43,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agentlatch import (
     SQLiteBackend,
+    calculate_state_execution,
     context_aware,
     get_memory,
     intent,
+    log_state_execution,
     profile_agent,
     safe_tool,
+    wrap_langgraph,
 )
 from agentlatch.memory.context import set_agent_id, set_node_context
 
@@ -691,7 +694,7 @@ def create_complex_support_graph() -> Any:
     builder.add_edge("web_researcher", END)
 
     memory_saver = MemorySaver()
-    return builder.compile(checkpointer=memory_saver)
+    return wrap_langgraph(builder.compile(checkpointer=memory_saver))
 
 
 # ---------------------------------------------------------------------------
@@ -761,6 +764,10 @@ def run_groq_complex_support_bot(
         _process_multi_agent_query(graph, user_input, config)
         print("-" * 50 + "\n")
 
+    metrics = calculate_state_execution()
+    if metrics["total_state_nodes_executed"] > 0:
+        log_state_execution(metrics, print_console=True)
+
     memory = get_memory()
     if memory:
         stats = memory.stats()
@@ -799,6 +806,11 @@ def _process_multi_agent_query(graph: Any, query: str, config: dict[str, Any]) -
                         if text_bits:
                             print(f"\n🤖 Agent Response:\n{' '.join(text_bits)}\n")
                             last_printed_id = msg_id
+
+        # Calculate and log per-state execution metrics for this query run
+        metrics = calculate_state_execution()
+        if metrics["total_state_nodes_executed"] > 0:
+            log_state_execution(metrics, print_console=True)
     except Exception as err:
         print(f"\n⚠️ Error processing multi-agent query: {err}\n")
 

@@ -11,6 +11,7 @@ import asyncio
 import functools
 import inspect
 import logging
+import time
 from typing import Any, Callable, TypeVar, overload
 
 from agentlatch._types import (
@@ -239,17 +240,31 @@ def wrap_langgraph(graph: Any) -> Any:
 
             graph.compile = wrapped_compile
 
-    # Case 2: Compiled StateGraph / CompiledGraph — wrap nodes dictionary and invoke methods
+    # Case 2: Compiled StateGraph / CompiledGraph / PregelNode
     if hasattr(graph, "nodes") and isinstance(graph.nodes, dict):
         for name, node in list(graph.nodes.items()):
-            fn = getattr(node, "runnable", node)
-            if callable(fn) and not getattr(fn, "_agentlatch_wrapped", False):
-                wrapped_fn = wrap_state_node(name, fn)
-                setattr(wrapped_fn, "_agentlatch_wrapped", True)
-                if hasattr(node, "runnable"):
+            # 1) Official langgraph PregelNode with bound.func / bound.afunc
+            if hasattr(node, "bound"):
+                bound = getattr(node, "bound")
+                target_attr = "func" if hasattr(bound, "func") else ("afunc" if hasattr(bound, "afunc") else None)
+                if target_attr and callable(getattr(bound, target_attr)):
+                    orig_fn = getattr(bound, target_attr)
+                    if not getattr(orig_fn, "_agentlatch_wrapped", False):
+                        wrapped_fn = wrap_state_node(name, orig_fn)
+                        setattr(wrapped_fn, "_agentlatch_wrapped", True)
+                        setattr(bound, target_attr, wrapped_fn)
+            # 2) Objects with runnable attribute
+            elif hasattr(node, "runnable") and callable(getattr(node, "runnable")):
+                orig_fn = getattr(node, "runnable")
+                if not getattr(orig_fn, "_agentlatch_wrapped", False):
+                    wrapped_fn = wrap_state_node(name, orig_fn)
+                    setattr(wrapped_fn, "_agentlatch_wrapped", True)
                     node.runnable = wrapped_fn
-                else:
-                    graph.nodes[name] = wrapped_fn
+            # 3) Direct callables (e.g. MockStateGraph)
+            elif callable(node) and not getattr(node, "_agentlatch_wrapped", False):
+                wrapped_fn = wrap_state_node(name, node)
+                setattr(wrapped_fn, "_agentlatch_wrapped", True)
+                graph.nodes[name] = wrapped_fn
 
     return graph
 
@@ -270,7 +285,13 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
     """
     root = trace or get_trace()
     graph_name = root.name if root else "LangGraphWorkflow"
-    total_graph_dur = root.duration if root else 0.0
+    if root:
+        if root.end_time is not None:
+            total_graph_dur = root.duration
+        else:
+            total_graph_dur = max(0.000001, time.monotonic() - root.start_time)
+    else:
+        total_graph_dur = 0.0
 
     state_events: list[TraceEvent] = []
 
@@ -409,12 +430,13 @@ def log_state_execution(
         print(f"{'State Node':<20} {'Count':<8} {'Total (ms)':<12} {'Avg (ms)':<12} {'Graph %':<10}")
         print("─" * 70)
         for node_name, stat in metrics["per_state_metrics"].items():
+            pct_str = f"{stat['percentage_of_graph']:.1f}%"
             print(
                 f"{node_name:<20} "
                 f"{stat['count']:<8} "
                 f"{stat['total_duration_sec'] * 1000:<12.2f} "
                 f"{stat['avg_duration_sec'] * 1000:<12.2f} "
-                f"{stat['percentage_of_graph']:<10.1f}%"
+                f"{pct_str:<10}"
             )
         print("─" * 70)
         if metrics["transitions"]:
