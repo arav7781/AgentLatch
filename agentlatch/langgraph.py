@@ -108,7 +108,7 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
         errors.append({
             "source": "llm_output",
             "error_type": "LLMUnparsedToolCallError",
-            "message": f"LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
+            "message": f"LLMUnparsedToolCallError: LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
         })
 
     return errors
@@ -450,9 +450,11 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
                 if err not in all_errors:
                     all_errors.append(err)
             if e.error_payload:
-                msg = f"{e.error_payload.get('error_type', 'Error')}: {e.error_payload.get('message', '')}"
-                if msg not in all_errors:
-                    all_errors.append(msg)
+                msg = e.error_payload.get("message", "")
+                err_type = e.error_payload.get("error_type", "Error")
+                fmt = f"{err_type}: {msg}" if (err_type and err_type not in msg) else msg
+                if fmt not in all_errors and msg not in all_errors:
+                    all_errors.append(fmt)
 
         per_state_metrics[node_name] = {
             "count": count,
