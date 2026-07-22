@@ -168,8 +168,22 @@ def generate_node(state: AgentState) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+from agentlatch import (
+    SQLiteBackend,
+    calculate_state_execution,
+    context_aware,
+    get_memory,
+    intent,
+    log_state_execution,
+    profile_agent,
+    safe_tool,
+    wrap_langgraph,
+)
+from agentlatch.memory.context import set_agent_id, set_node_context
+
+
 def create_langgraph_pipeline() -> Any:
-    """Construct and compile the LangGraph StateGraph."""
+    """Construct and compile the LangGraph StateGraph wrapped with AgentLatch profiling."""
     workflow = StateGraph(AgentState)
 
     # Add nodes
@@ -183,7 +197,8 @@ def create_langgraph_pipeline() -> Any:
     workflow.add_edge("analyze", "generate")
     workflow.add_edge("generate", END)
 
-    return workflow.compile()
+    # Wrap StateGraph for automated high-precision state execution tracking
+    return wrap_langgraph(workflow.compile())
 
 
 # ---------------------------------------------------------------------------
@@ -219,6 +234,10 @@ def run_langgraph_agent(
     print("\n" + "=" * 60)
     print(f"📋 Output: {final_state.get('final_answer')}")
     print("=" * 60)
+
+    # Calculate and output precision state metrics
+    metrics = calculate_state_execution()
+    log_state_execution(metrics, print_console=True)
 
     memory = get_memory()
     if memory:

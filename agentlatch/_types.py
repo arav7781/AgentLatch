@@ -19,6 +19,59 @@ class EventStatus(enum.Enum):
     RETRY = "retry"
     MEMORY_OP = "memory_op"
     LEARNING = "learning"
+    STATE_NODE = "state_node"
+
+
+# ---------------------------------------------------------------------------
+# LangGraph & State Execution Types
+# ---------------------------------------------------------------------------
+
+
+class PerStateMetric(TypedDict):
+    """Execution timing and invocation metrics for a specific LangGraph node/state."""
+
+    count: int
+    total_duration_sec: float
+    avg_duration_sec: float
+    min_duration_sec: float
+    max_duration_sec: float
+    percentage_of_graph: float
+    state_keys_modified: list[str]
+
+
+class StateTransition(TypedDict):
+    """A recorded transition from one state/node to another in LangGraph."""
+
+    from_state: str
+    to_state: str
+    duration_sec: float
+    timestamp_iso: str
+
+
+class StateNodeLog(TypedDict):
+    """Structured high-precision log entry for a single state node execution."""
+
+    node_name: str
+    start_time_iso: str
+    end_time_iso: str
+    duration_ms: float
+    duration_us: float
+    status: str
+    state_input_keys: list[str]
+    state_output_keys: list[str]
+    delta_keys: list[str]
+
+
+class StateExecutionMetrics(TypedDict):
+    """Calculated breakdown of all state node executions in a LangGraph graph trace."""
+
+    graph_name: str
+    total_graph_duration_sec: float
+    total_state_nodes_executed: int
+    per_state_metrics: dict[str, PerStateMetric]
+    transitions: list[StateTransition]
+    state_logs: list[StateNodeLog]
+
 
 
 # ---------------------------------------------------------------------------

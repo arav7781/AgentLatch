@@ -25,6 +25,7 @@ _COLORS = {
     EventStatus.RETRY: "bright_magenta",
     EventStatus.MEMORY_OP: "bright_cyan",
     EventStatus.LEARNING: "bright_yellow",
+    EventStatus.STATE_NODE: "bright_magenta",
     "llm": "bright_blue",
     "dim": "dim",
     "header": "bold bright_cyan",
@@ -38,6 +39,7 @@ _BAR_CHARS = {
     EventStatus.RETRY: "▓",
     EventStatus.MEMORY_OP: "░",
     EventStatus.LEARNING: "▒",
+    EventStatus.STATE_NODE: "▓",
     "llm": "░",
     "gap": "░",
 }
@@ -48,13 +50,15 @@ _BAR_CHARS = {
 # ---------------------------------------------------------------------------
 
 
-def _format_duration(seconds: float) -> str:
-    """Human-friendly duration string."""
+def _format_duration(seconds: float, high_precision: bool = True) -> str:
+    """Human-friendly duration string with microsecond precision when high_precision=True."""
     if seconds < 0.001:
-        return f"{seconds * 1_000_000:.0f}µs"
+        us = seconds * 1_000_000
+        return f"{us:.1f}µs" if high_precision else f"{us:.0f}µs"
     if seconds < 1.0:
-        return f"{seconds * 1_000:.0f}ms"
-    return f"{seconds:.2f}s"
+        ms = seconds * 1_000
+        return f"{ms:.2f}ms" if high_precision else f"{ms:.0f}ms"
+    return f"{seconds:.3f}s" if high_precision else f"{seconds:.2f}s"
 
 
 def _build_timeline_bar(
@@ -103,6 +107,8 @@ def _build_timeline_bar(
             status_tag = " 🧠 MEMORY"
         elif child.status == EventStatus.LEARNING:
             status_tag = " 📖 LEARNING"
+        elif child.status == EventStatus.STATE_NODE:
+            status_tag = " ⚡ STATE"
 
         label_parts.append(f"{child.name} {_format_duration(child_dur)}{status_tag}")
 
@@ -134,27 +140,29 @@ def _build_summary_table(trace: TraceEvent) -> Table:
         pad_edge=True,
         expand=True,
     )
-    table.add_column("Tool", style="bright_white", ratio=3)
+    table.add_column("Tool / State Node", style="bright_white", ratio=3)
     table.add_column("Duration", style="bright_cyan", justify="right", ratio=1)
     table.add_column("Status", justify="center", ratio=1)
-    table.add_column("Error", style="dim", ratio=3)
+    table.add_column("Details", style="dim", ratio=3)
 
     for child in trace.children:
         status_style = _COLORS.get(child.status, "white")
         status_text = Text(child.status.value.upper(), style=status_style)
 
-        error_info = ""
+        details_info = ""
         if child.error_payload:
-            error_info = (
+            details_info = (
                 f"{child.error_payload.get('error_type', '?')}: "
                 f"{child.error_payload.get('message', '')}"
             )
+        elif child.metadata and "delta_keys" in child.metadata:
+            details_info = f"Deltas: {child.metadata.get('delta_keys', [])}"
 
         table.add_row(
             child.name,
             _format_duration(child.duration),
             status_text,
-            error_info,
+            details_info,
         )
 
     return table
@@ -181,23 +189,30 @@ def render_flamegraph(
     tool_time = _compute_tool_time(trace)
     llm_time = max(0.0, total - tool_time)
 
-    # Count memory and retry events.
+    # Count memory, retry, and state node events.
     memory_ops = sum(1 for c in trace.children if c.status == EventStatus.MEMORY_OP)
     retries = sum(1 for c in trace.children if c.status == EventStatus.RETRY)
     learnings = sum(1 for c in trace.children if c.status == EventStatus.LEARNING)
+    state_nodes = sum(
+        1
+        for c in trace.children
+        if c.status == EventStatus.STATE_NODE or c.metadata.get("is_state_node")
+    )
 
     # -- Header ----------------------------------------------------------
     header = Text()
     header.append("⚡ AGENTLATCH EXECUTION PROFILE\n", style=_COLORS["header"])
     header.append(
         f"   Total: {_format_duration(total)}  │  "
-        f"Tools: {_format_duration(tool_time)}  │  "
+        f"Tools/Nodes: {_format_duration(tool_time)}  │  "
         f"LLM Reasoning: {_format_duration(llm_time)}",
         style="bright_white",
     )
-    if memory_ops or retries or learnings:
+    if memory_ops or retries or learnings or state_nodes:
         header.append("\n", style="bright_white")
         parts = []
+        if state_nodes:
+            parts.append(f"LangGraph States: {state_nodes}")
         if memory_ops:
             parts.append(f"Memory: {memory_ops}")
         if retries:
@@ -249,6 +264,8 @@ def render_flamegraph(
     legend.append("Tool (ERROR)  ", style="dim")
     legend.append("▒ ", style=_COLORS[EventStatus.TIMEOUT])
     legend.append("Tool (TIMEOUT)  ", style="dim")
+    legend.append("▓ ", style=_COLORS[EventStatus.STATE_NODE])
+    legend.append("State Node  ", style="dim")
     legend.append("▓ ", style=_COLORS[EventStatus.RETRY])
     legend.append("Retry  ", style="dim")
     legend.append("░ ", style=_COLORS[EventStatus.MEMORY_OP])
