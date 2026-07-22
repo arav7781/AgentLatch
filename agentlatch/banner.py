@@ -74,6 +74,8 @@ _ART_LINES: list[str] = (
     _ATMOS_TOP + _AGENT_LINES + _DIVIDER + _LATCH_LINES + _ATMOS_BOTTOM
 )
 
+from agentlatch import __version__
+
 # Pre-compute which rows are ASCII-art text (not atmosphere).
 _TEXT_ROW_START = len(_ATMOS_TOP)
 _TEXT_ROW_END = _TEXT_ROW_START + len(_AGENT_LINES) + len(_DIVIDER) + len(_LATCH_LINES)
@@ -83,7 +85,7 @@ _TEXT_ROWS: set[int] = set(range(_TEXT_ROW_START, _TEXT_ROW_END))
 # Welcome / Tagline
 # ---------------------------------------------------------------------------
 
-_WELCOME_LINE = "  Terminal-native agent resilience middleware  v0.1.0"
+_WELCOME_LINE = f"  Terminal-native agent resilience middleware  v{__version__}"
 _READY_LINE = "  Let's get started."
 
 # ---------------------------------------------------------------------------

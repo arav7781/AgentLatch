@@ -64,8 +64,10 @@ class TestBanner:
 
     def test_contains_version(self):
         """Output should include the version number."""
+        from agentlatch import __version__
+
         output = _capture_banner()
-        assert "v0.1.0" in output
+        assert f"v{__version__}" in output
 
     def test_contains_lightning_bolt(self):
         """The ⚡ divider between AGENT and LATCH must appear."""
