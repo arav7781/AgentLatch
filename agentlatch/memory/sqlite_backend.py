@@ -14,7 +14,9 @@ JSON columns are stored as TEXT and deserialized on read.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import threading
 import time
 import uuid
 from typing import Any
@@ -78,14 +80,43 @@ class SQLiteBackend(MemoryBackend):
                  ``":memory:"`` for ephemeral in-process storage.
                  Use a file path (e.g. ``".agentlatch.db"``) for
                  persistence across runs.
+
+    Raises:
+        ValueError: If *db_path* contains path-traversal sequences or
+                    null bytes.
     """
 
+    # Characters / sequences that are never valid in a db_path.
+    _FORBIDDEN_PATTERNS = ("..", "\x00")
+
     def __init__(self, db_path: str = ":memory:") -> None:
+        self._validate_db_path(db_path)
         self._db_path = db_path
+        self._lock = threading.Lock()
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._init_schema()
+
+    # ------------------------------------------------------------------
+    # Path Validation
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _validate_db_path(cls, db_path: str) -> None:
+        """Reject paths that could escape the intended directory."""
+        if db_path == ":memory:":
+            return
+        for pattern in cls._FORBIDDEN_PATTERNS:
+            if pattern in db_path:
+                raise ValueError(
+                    f"Unsafe db_path: contains forbidden sequence {pattern!r}. "
+                    f"Use a simple filename like '.agentlatch.db'."
+                )
+        # Resolve and ensure the path doesn't escape via symlinks.
+        resolved = os.path.realpath(db_path)
+        if "\x00" in resolved:
+            raise ValueError("Unsafe db_path: resolved path contains null bytes.")
 
     def _init_schema(self) -> None:
         """Create tables and indexes if they don't exist."""
@@ -103,28 +134,29 @@ class SQLiteBackend(MemoryBackend):
     def store(self, snapshot: MemorySnapshot) -> str:
         snap_id = snapshot.get("id") or str(uuid.uuid4())
 
-        self._conn.execute(
-            """\
-            INSERT INTO snapshots
-                (id, tool_name, intent, input_summary, output_summary,
-                 timestamp, node_context, status, delta, agent_id, session_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                snap_id,
-                snapshot.get("tool_name", ""),
-                snapshot.get("intent"),
-                _to_json(snapshot.get("input_summary")),
-                _to_json(snapshot.get("output_summary")),
-                snapshot.get("timestamp", time.time()),
-                snapshot.get("node_context"),
-                snapshot.get("status", "success"),
-                _to_json(snapshot.get("delta")),
-                snapshot.get("agent_id"),
-                snapshot.get("session_id"),
-            ),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """\
+                INSERT INTO snapshots
+                    (id, tool_name, intent, input_summary, output_summary,
+                     timestamp, node_context, status, delta, agent_id, session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    snap_id,
+                    snapshot.get("tool_name", ""),
+                    snapshot.get("intent"),
+                    _to_json(snapshot.get("input_summary")),
+                    _to_json(snapshot.get("output_summary")),
+                    snapshot.get("timestamp", time.time()),
+                    snapshot.get("node_context"),
+                    snapshot.get("status", "success"),
+                    _to_json(snapshot.get("delta")),
+                    snapshot.get("agent_id"),
+                    snapshot.get("session_id"),
+                ),
+            )
+            self._conn.commit()
         return snap_id
 
     def query(
@@ -156,7 +188,8 @@ class SQLiteBackend(MemoryBackend):
         sql = f"SELECT * FROM snapshots{where} ORDER BY timestamp DESC LIMIT ?"
         params.append(limit)
 
-        rows = self._conn.execute(sql, params).fetchall()
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
         return [_row_to_snapshot(row) for row in rows]
 
     def get_last_snapshot(
@@ -164,18 +197,19 @@ class SQLiteBackend(MemoryBackend):
         tool_name: str,
         intent: str | None = None,
     ) -> MemorySnapshot | None:
-        if intent is not None:
-            row = self._conn.execute(
-                "SELECT * FROM snapshots WHERE tool_name = ? AND intent = ? "
-                "ORDER BY timestamp DESC LIMIT 1",
-                (tool_name, intent),
-            ).fetchone()
-        else:
-            row = self._conn.execute(
-                "SELECT * FROM snapshots WHERE tool_name = ? "
-                "ORDER BY timestamp DESC LIMIT 1",
-                (tool_name,),
-            ).fetchone()
+        with self._lock:
+            if intent is not None:
+                row = self._conn.execute(
+                    "SELECT * FROM snapshots WHERE tool_name = ? AND intent = ? "
+                    "ORDER BY timestamp DESC LIMIT 1",
+                    (tool_name, intent),
+                ).fetchone()
+            else:
+                row = self._conn.execute(
+                    "SELECT * FROM snapshots WHERE tool_name = ? "
+                    "ORDER BY timestamp DESC LIMIT 1",
+                    (tool_name,),
+                ).fetchone()
 
         return _row_to_snapshot(row) if row else None
 
@@ -186,32 +220,34 @@ class SQLiteBackend(MemoryBackend):
     def store_learning(self, tool_name: str, learning: ToolLearning) -> None:
         learn_id = learning.get("id") or str(uuid.uuid4())
 
-        self._conn.execute(
-            """\
-            INSERT INTO learnings
-                (id, tool_name, failure_count, failure_patterns,
-                 suggested_docstring, suggested_params, correction_hints,
-                 timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                learn_id,
-                tool_name,
-                learning.get("failure_count", 0),
-                _to_json(learning.get("failure_patterns")),
-                learning.get("suggested_docstring"),
-                _to_json(learning.get("suggested_params")),
-                _to_json(learning.get("correction_hints")),
-                learning.get("timestamp", time.time()),
-            ),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """\
+                INSERT INTO learnings
+                    (id, tool_name, failure_count, failure_patterns,
+                     suggested_docstring, suggested_params, correction_hints,
+                     timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    learn_id,
+                    tool_name,
+                    learning.get("failure_count", 0),
+                    _to_json(learning.get("failure_patterns")),
+                    learning.get("suggested_docstring"),
+                    _to_json(learning.get("suggested_params")),
+                    _to_json(learning.get("correction_hints")),
+                    learning.get("timestamp", time.time()),
+                ),
+            )
+            self._conn.commit()
 
     def get_learnings(self, tool_name: str) -> list[ToolLearning]:
-        rows = self._conn.execute(
-            "SELECT * FROM learnings WHERE tool_name = ? ORDER BY timestamp DESC",
-            (tool_name,),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM learnings WHERE tool_name = ? ORDER BY timestamp DESC",
+                (tool_name,),
+            ).fetchall()
         return [_row_to_learning(row) for row in rows]
 
     # ------------------------------------------------------------------
@@ -220,18 +256,24 @@ class SQLiteBackend(MemoryBackend):
 
     def close(self) -> None:
         """Close the SQLite connection."""
-        try:
-            self._conn.close()
-        except Exception:
-            pass  # Already closed — harmless.
+        with self._lock:
+            try:
+                self._conn.close()
+            except Exception:
+                pass  # Already closed — harmless.
 
     # ------------------------------------------------------------------
     # Stats
     # ------------------------------------------------------------------
 
     def stats(self) -> dict[str, Any]:
-        snap_count = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
-        learn_count = self._conn.execute("SELECT COUNT(*) FROM learnings").fetchone()[0]
+        with self._lock:
+            snap_count = self._conn.execute(
+                "SELECT COUNT(*) FROM snapshots"
+            ).fetchone()[0]
+            learn_count = self._conn.execute(
+                "SELECT COUNT(*) FROM learnings"
+            ).fetchone()[0]
         return {
             "backend": "sqlite",
             "db_path": self._db_path,

@@ -13,6 +13,7 @@ import concurrent.futures
 import functools
 import inspect
 import json
+import re
 from collections.abc import Callable
 from typing import Any, TypeVar, overload
 
@@ -36,12 +37,42 @@ F = TypeVar("F", bound=Callable[..., Any])
 # =====================================================================
 
 
-def _build_error_payload(exc: Exception) -> ErrorPayload:
-    """Translate a raw Python exception into an LLM-friendly JSON dict."""
+# Maximum length for error messages exposed to the LLM.
+_MAX_ERROR_MSG_LEN = 200
+
+# Patterns that may leak sensitive internal state in error messages.
+_SENSITIVE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"(/[\w./-]+\.py)", re.IGNORECASE),             # file paths
+    re.compile(r"(api[_-]?key|secret|token|password)\s*[=:]\s*\S+", re.IGNORECASE),
+    re.compile(r"line \d+, in \w+", re.IGNORECASE),             # traceback fragments
+]
+
+
+def _sanitize_error_message(msg: str) -> str:
+    """Strip sensitive patterns and truncate error messages."""
+    for pattern in _SENSITIVE_PATTERNS:
+        msg = pattern.sub("[REDACTED]", msg)
+    if len(msg) > _MAX_ERROR_MSG_LEN:
+        msg = msg[:_MAX_ERROR_MSG_LEN] + "... [truncated]"
+    return msg
+
+
+def _build_error_payload(exc: Exception, *, safe_mode: bool = True) -> ErrorPayload:
+    """Translate a raw Python exception into an LLM-friendly JSON dict.
+
+    Args:
+        exc:       The caught exception.
+        safe_mode: If ``True`` (default), sanitize the error message by
+                   stripping file paths, credentials, and traceback
+                   fragments, and truncating to a safe length.
+    """
+    message = str(exc)
+    if safe_mode:
+        message = _sanitize_error_message(message)
     return {
         "status": "error",
         "error_type": type(exc).__name__,
-        "message": str(exc),
+        "message": message,
         "instruction": (
             "The tool execution failed. Review your parameters and "
             "retry with corrected inputs."
@@ -83,6 +114,7 @@ def safe_tool(
     on_fail: str = "instruct_llm",
     max_response_tokens: int | None = None,
     sample_rows: int | None = None,
+    safe_mode: bool = True,
 ) -> F | Callable[[F], F]:
     """Decorator that makes a tool function resilient and observable.
 
@@ -98,6 +130,9 @@ def safe_tool(
         max_response_tokens:  Approximate token ceiling for responses.
         sample_rows:          If the response contains a list, keep only
                               the first N elements.
+        safe_mode:            If ``True`` (default), sanitize exception
+                              messages to avoid leaking file paths,
+                              credentials, or traceback fragments.
     """
 
     def decorator(fn: F) -> F:
@@ -122,7 +157,7 @@ def safe_tool(
                         end_child(event, EventStatus.TIMEOUT, payload)
                     return json.dumps(payload)
                 except Exception as exc:
-                    payload = _build_error_payload(exc)
+                    payload = _build_error_payload(exc, safe_mode=safe_mode)
                     if event:
                         end_child(event, EventStatus.ERROR, payload)
                     return json.dumps(payload)
@@ -151,7 +186,11 @@ def safe_tool(
                             max_workers=1
                         ) as pool:
                             future = pool.submit(fn, *args, **kwargs)
-                            result = future.result(timeout=timeout)
+                            try:
+                                result = future.result(timeout=timeout)
+                            except concurrent.futures.TimeoutError:
+                                future.cancel()
+                                raise
                     else:
                         result = fn(*args, **kwargs)
                 except concurrent.futures.TimeoutError:
@@ -160,7 +199,7 @@ def safe_tool(
                         end_child(event, EventStatus.TIMEOUT, payload)
                     return json.dumps(payload)
                 except Exception as exc:
-                    payload = _build_error_payload(exc)
+                    payload = _build_error_payload(exc, safe_mode=safe_mode)
                     if event:
                         end_child(event, EventStatus.ERROR, payload)
                     return json.dumps(payload)
