@@ -42,9 +42,9 @@ _MAX_ERROR_MSG_LEN = 200
 
 # Patterns that may leak sensitive internal state in error messages.
 _SENSITIVE_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(/[\w./-]+\.py)", re.IGNORECASE),             # file paths
+    re.compile(r"(/[\w./-]+\.py)", re.IGNORECASE),  # file paths
     re.compile(r"(api[_-]?key|secret|token|password)\s*[=:]\s*\S+", re.IGNORECASE),
-    re.compile(r"line \d+, in \w+", re.IGNORECASE),             # traceback fragments
+    re.compile(r"line \d+, in \w+", re.IGNORECASE),  # traceback fragments
 ]
 
 

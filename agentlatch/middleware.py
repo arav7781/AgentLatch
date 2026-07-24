@@ -132,9 +132,7 @@ class AgentLatchMiddleware(BaseHTTPMiddleware):
         # (the default), fall back to dev-mode detection so production
         # deployments don't accidentally leak version/timing info.
         should_expose = (
-            self.expose_headers
-            if self.expose_headers is not None
-            else is_dev_mode()
+            self.expose_headers if self.expose_headers is not None else is_dev_mode()
         )
 
         # --- Inject headers (when enabled) ---
