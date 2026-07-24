@@ -55,6 +55,9 @@ def _build_app(*, inject_profile: bool = True) -> Starlette:
         AgentLatchMiddleware,
         inject_profile=inject_profile,
         trace_name="TestAgent",
+        # Tests suppress dev-mode visuals (set_dev_mode(False)) but still
+        # need headers exposed so we can assert on them.
+        expose_headers=True,
     )
     return app
 
