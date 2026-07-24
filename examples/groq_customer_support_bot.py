@@ -118,7 +118,16 @@ def prepare_database(db_path: str = DB_FILE, backup_path: str = BACKUP_DB) -> st
     tables = pd.read_sql(
         "SELECT name FROM sqlite_master WHERE type='table';", conn
     ).name.tolist()
-    tdf = {t: pd.read_sql(f"SELECT * from {t}", conn) for t in tables}
+    # Allowlist: only process expected tables to prevent injection via
+    # tampered sqlite_master entries.  Table names are also quoted as
+    # identifiers to guard against special characters.
+    _ALLOWED_TABLES = {
+        "flights", "bookings", "tickets", "ticket_flights",
+        "boarding_passes", "airports", "aircrafts", "seats",
+        "hotels", "car_rentals", "trip_recommendations",
+    }
+    safe_tables = [t for t in tables if t in _ALLOWED_TABLES]
+    tdf = {t: pd.read_sql(f'SELECT * from "{t}"', conn) for t in safe_tables}
 
     if "flights" in tdf and not tdf["flights"].empty:
         example_time = pd.to_datetime(

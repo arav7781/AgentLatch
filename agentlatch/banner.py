@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import random
 import sys
+import threading
 import time
 
 from rich.console import Console
@@ -118,6 +119,7 @@ _TYPING_DELAY = 0.025  # per character for welcome text
 # ---------------------------------------------------------------------------
 
 _banner_shown: bool = False
+_banner_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # Style Mapping
@@ -316,9 +318,10 @@ def initialize_latch(console: Console | None = None) -> None:
     Calling this more than once per process is a no-op.
     """
     global _banner_shown
-    if _banner_shown:
-        return
-    _banner_shown = True
+    with _banner_lock:
+        if _banner_shown:
+            return
+        _banner_shown = True
 
     if os.environ.get("AGENTLATCH_ENV", "").lower().strip() == "production":
         return
@@ -334,4 +337,5 @@ def initialize_latch(console: Console | None = None) -> None:
 def reset_banner() -> None:
     """Reset the banner flag.  Useful for tests."""
     global _banner_shown
-    _banner_shown = False
+    with _banner_lock:
+        _banner_shown = False

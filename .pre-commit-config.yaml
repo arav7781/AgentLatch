@@ -14,3 +14,18 @@ repos:
       - id: ruff
         args: [ --fix ]
       - id: ruff-format
+
+  # Security linting — catches common vulnerability patterns.
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml", "--recursive", "--quiet"]
+        additional_dependencies: ["bandit[toml]"]
+
+  # Prevent accidental commits of API keys, passwords, and secrets.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
