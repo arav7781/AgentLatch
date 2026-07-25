@@ -86,13 +86,11 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
                         if child.error_payload
                         else "ToolError"
                     )
-                    errors.append(
-                        {
-                            "source": child.name,
-                            "error_type": err_type,
-                            "message": err_msg,
-                        }
-                    )
+                    errors.append({
+                        "source": child.name,
+                        "error_type": err_type,
+                        "message": err_msg,
+                    })
                 _scan(child)
 
         _scan(event)
@@ -112,13 +110,11 @@ def _inspect_errors(output: Any, event: TraceEvent | None) -> list[dict[str, Any
     ):
         func_calls = re.findall(r"<function=([^>]+)>", text_content)
         sample = func_calls[0] if func_calls else "unknown"
-        errors.append(
-            {
-                "source": "llm_output",
-                "error_type": "LLMUnparsedToolCallError",
-                "message": f"LLMUnparsedToolCallError: LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
-            }
-        )
+        errors.append({
+            "source": "llm_output",
+            "error_type": "LLMUnparsedToolCallError",
+            "message": f"LLMUnparsedToolCallError: LLM emitted {len(func_calls)} raw unparsed function call string(s) (e.g. <function={sample}>) instead of executing tool calls.",
+        })
 
     return errors
 
@@ -402,14 +398,12 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
         per_state_raw[node_name].append(ev)
 
         # Transition record
-        transitions.append(
-            {
-                "from_state": prev_node,
-                "to_state": node_name,
-                "duration_sec": ev.duration,
-                "timestamp_iso": ev.start_time_iso,
-            }
-        )
+        transitions.append({
+            "from_state": prev_node,
+            "to_state": node_name,
+            "duration_sec": ev.duration,
+            "timestamp_iso": ev.start_time_iso,
+        })
         prev_node = node_name
 
         # Collect errors for this node event
@@ -420,31 +414,27 @@ def calculate_state_execution(trace: TraceEvent | None = None) -> StateExecution
                 node_err_list = list(node_err_list) + [msg]
 
         # State log entry
-        state_logs.append(
-            {
-                "node_name": node_name,
-                "start_time_iso": ev.start_time_iso,
-                "end_time_iso": ev.end_time_iso,
-                "duration_ms": round(ev.duration_ms, 3),
-                "duration_us": round(ev.duration_us, 1),
-                "status": ev.status.value,
-                "state_input_keys": ev.metadata.get("input_keys", []),
-                "state_output_keys": ev.metadata.get("output_keys", []),
-                "delta_keys": ev.metadata.get("delta_keys", []),
-                "errors_count": len(node_err_list),
-                "error_details": node_err_list,
-            }
-        )
+        state_logs.append({
+            "node_name": node_name,
+            "start_time_iso": ev.start_time_iso,
+            "end_time_iso": ev.end_time_iso,
+            "duration_ms": round(ev.duration_ms, 3),
+            "duration_us": round(ev.duration_us, 1),
+            "status": ev.status.value,
+            "state_input_keys": ev.metadata.get("input_keys", []),
+            "state_output_keys": ev.metadata.get("output_keys", []),
+            "delta_keys": ev.metadata.get("delta_keys", []),
+            "errors_count": len(node_err_list),
+            "error_details": node_err_list,
+        })
 
     if prev_node != "START":
-        transitions.append(
-            {
-                "from_state": prev_node,
-                "to_state": "END",
-                "duration_sec": 0.0,
-                "timestamp_iso": root.end_time_iso if root else "",
-            }
-        )
+        transitions.append({
+            "from_state": prev_node,
+            "to_state": "END",
+            "duration_sec": 0.0,
+            "timestamp_iso": root.end_time_iso if root else "",
+        })
 
     # Build per-state calculated breakdown
     per_state_metrics: dict[str, PerStateMetric] = {}

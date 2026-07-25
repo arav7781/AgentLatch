@@ -50,7 +50,13 @@ Complete development roadmap and technical specifications.
 
 ## Phase 5: Package API (`__init__.py`)
 ```python
-from agentlatch import profile_agent, safe_tool, render_flamegraph, TraceEvent, get_trace
+from agentlatch import (
+    profile_agent,
+    safe_tool,
+    render_flamegraph,
+    TraceEvent,
+    get_trace,
+)
 ```
 
 ## Phase 6: Testing

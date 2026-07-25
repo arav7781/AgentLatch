@@ -62,18 +62,23 @@ AgentLatch is built to address critical requirements of production-ready AI agen
 ```python
 from agentlatch import profile_agent, safe_tool
 
+
 @safe_tool
 def query_database(sql: str) -> str:
     """This tool is now protected — exceptions become JSON errors."""
     import sqlite3
+
     conn = sqlite3.connect("my.db")
     return str(conn.execute(sql).fetchall())
+
 
 @safe_tool(timeout=5.0)
 def call_api(url: str) -> str:
     """This tool has a 5-second cross-platform timeout."""
     import requests
+
     return requests.get(url).text
+
 
 @profile_agent
 def run_agent():
@@ -81,6 +86,7 @@ def run_agent():
     result = query_database("SELECT * FROM users")
     weather = call_api("https://api.weather.com/sf")
     return f"Got {result} and {weather}"
+
 
 run_agent()
 ```
@@ -108,7 +114,7 @@ app = FastAPI()
 app.add_middleware(
     AgentLatchMiddleware,
     inject_profile=True,  # Appends "_agentlatch" to JSON response body
-    trace_name="MyChatAgent"
+    trace_name="MyChatAgent",
 )
 ```
 
@@ -176,14 +182,17 @@ app.add_middleware(
 ```python
 from agentlatch import context_aware, intent, safe_tool, profile_agent
 
+
 @intent("database_query")
 @context_aware(delta=True)
 @safe_tool
 def query_db(sql: str) -> str:
     """Memory-aware tool with delta tracking."""
     import sqlite3
+
     conn = sqlite3.connect("my.db")
     return str(conn.execute(sql).fetchall())
+
 
 @profile_agent  # Auto-initializes SQLite memory
 def run_agent():
@@ -200,11 +209,13 @@ from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from agentlatch import context_aware, intent, safe_tool, profile_agent, get_memory
 
+
 # 1. Define State
 class AgentState(TypedDict):
     query: str
     documents: list[str]
     analysis: str
+
 
 # 2. Define Traced & Memory-Aware Nodes
 @intent("retrieval")
@@ -213,6 +224,7 @@ class AgentState(TypedDict):
 def retrieve_node(state: AgentState) -> dict:
     return {"documents": ["Doc 1", "Doc 2"]}
 
+
 @intent("analysis")
 @context_aware(delta=True)
 @safe_tool
@@ -220,7 +232,10 @@ def analyze_node(state: AgentState) -> dict:
     memory = get_memory()
     # Query upstream memory recorded during "retrieval" node
     upstream_docs = memory.query(intent="retrieval") if memory else []
-    return {"analysis": f"Analyzed {len(state['documents'])} docs (upstream hits: {len(upstream_docs)})"}
+    return {
+        "analysis": f"Analyzed {len(state['documents'])} docs (upstream hits: {len(upstream_docs)})"
+    }
+
 
 # 3. Build Graph
 workflow = StateGraph(AgentState)
@@ -231,16 +246,22 @@ workflow.add_edge("retrieve", "analyze")
 workflow.add_edge("analyze", END)
 pipeline = workflow.compile()
 
+
 # 4. Traced Execution
 @profile_agent(name="LangGraphAgent")
 def run_langgraph():
-    return pipeline.invoke({"query": "LangGraph + AgentLatch", "documents": [], "analysis": ""})
+    return pipeline.invoke({
+        "query": "LangGraph + AgentLatch",
+        "documents": [],
+        "analysis": "",
+    })
 ```
 
 ### Multi-Agent DAG (Leader / Sub-Agent)
 ```python
 from agentlatch import context_aware, intent, safe_tool, profile_agent, SQLiteBackend
 from agentlatch.memory.context import get_memory, set_agent_id, set_node_context
+
 
 # --- Sub-Agent Tools ---
 @intent("research")
@@ -249,11 +270,13 @@ from agentlatch.memory.context import get_memory, set_agent_id, set_node_context
 def search_docs(query: str) -> str:
     return '{"results": ["doc1", "doc2"]}'
 
+
 @intent("analyze")
 @context_aware(delta=True)
 @safe_tool
 def analyze(data: str) -> str:
     return '{"insight": "growth is 12%"}'
+
 
 # --- Leader Agent ---
 @profile_agent(name="LeaderAgent", memory_backend=SQLiteBackend(".agent.db"))
@@ -276,15 +299,15 @@ def run_pipeline():
 ```python
 from agentlatch import profile_agent, SQLiteBackend
 
+
 # Persistent file-based memory
 @profile_agent(memory_backend=SQLiteBackend(".agentlatch.db"))
-def persistent_agent():
-    ...
+def persistent_agent(): ...
+
 
 # Disable memory entirely
 @profile_agent(enable_memory=False)
-def no_memory_agent():
-    ...
+def no_memory_agent(): ...
 ```
 
 ## Running Examples

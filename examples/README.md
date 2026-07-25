@@ -55,8 +55,8 @@ graph LR
   * LangChain tool decorators wrapping underlying `@safe_tool` routines:
     ```python
     @safe_tool(timeout=10.0, sample_rows=5)
-    def query_database(sql: str) -> str:
-        ...
+    def query_database(sql: str) -> str: ...
+
 
     @langchain_tool
     def query_database_tool(sql: str) -> str:

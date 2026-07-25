@@ -31,13 +31,11 @@ def _sample_list(data: list, limit: int) -> list:
     if len(data) <= limit:
         return data
     sampled = data[:limit]
-    sampled.append(
-        {
-            "_agentlatch_sampled": True,
-            "shown": limit,
-            "total": len(data),
-        }
-    )
+    sampled.append({
+        "_agentlatch_sampled": True,
+        "shown": limit,
+        "total": len(data),
+    })
     return sampled
 
 

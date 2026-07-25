@@ -28,6 +28,7 @@ Establish the Python project structure, package scaffolding, and central type de
       ERROR = "error"
       TIMEOUT = "timeout"
 
+
   ErrorPayload: TypeAlias = dict[str, Any]
   ```
 

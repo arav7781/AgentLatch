@@ -91,24 +91,22 @@ class WorkflowState:
 def search_documents(query: str) -> str:
     """Researcher sub-agent tool: search document corpus."""
     time.sleep(0.18)  # Simulate DB lookup
-    return json.dumps(
-        {
-            "results": [
-                {
-                    "doc": "AgentLatch uses contextvars for trace and memory propagation",
-                    "score": 0.96,
-                },
-                {
-                    "doc": "MemorySnapshots enable cross-node data sharing across sub-agents",
-                    "score": 0.91,
-                },
-                {
-                    "doc": "Delta updates eliminate redundant storage in iterative LLM runs",
-                    "score": 0.85,
-                },
-            ]
-        }
-    )
+    return json.dumps({
+        "results": [
+            {
+                "doc": "AgentLatch uses contextvars for trace and memory propagation",
+                "score": 0.96,
+            },
+            {
+                "doc": "MemorySnapshots enable cross-node data sharing across sub-agents",
+                "score": 0.91,
+            },
+            {
+                "doc": "Delta updates eliminate redundant storage in iterative LLM runs",
+                "score": 0.85,
+            },
+        ]
+    })
 
 
 @intent("research")
@@ -117,16 +115,14 @@ def search_documents(query: str) -> str:
 def fetch_external_data(source: str) -> str:
     """Researcher sub-agent tool: fetch metric data."""
     time.sleep(0.15)  # Simulate API lookup
-    return json.dumps(
-        {
-            "source": source,
-            "metrics": {
-                "total_users": 24500,
-                "daily_active": 4120,
-                "growth_rate_pct": 14.5,
-            },
-        }
-    )
+    return json.dumps({
+        "source": source,
+        "metrics": {
+            "total_users": 24500,
+            "daily_active": 4120,
+            "growth_rate_pct": 14.5,
+        },
+    })
 
 
 @intent("analyze")
@@ -135,13 +131,11 @@ def fetch_external_data(source: str) -> str:
 def analyze_data(data_summary: str) -> str:
     """Analyst sub-agent tool: process research metrics."""
     time.sleep(0.22)  # Simulate analytical tool execution
-    return json.dumps(
-        {
-            "status": "analyzed",
-            "processed_input_length": len(data_summary),
-            "insights_extracted": 3,
-        }
-    )
+    return json.dumps({
+        "status": "analyzed",
+        "processed_input_length": len(data_summary),
+        "insights_extracted": 3,
+    })
 
 
 @intent("write")
@@ -150,13 +144,11 @@ def analyze_data(data_summary: str) -> str:
 def generate_report(context: str) -> str:
     """Writer sub-agent tool: compile executive report."""
     time.sleep(0.25)  # Simulate formatting tool
-    return json.dumps(
-        {
-            "report_type": "Executive Summary",
-            "context_length": len(context),
-            "status": "ready",
-        }
-    )
+    return json.dumps({
+        "report_type": "Executive Summary",
+        "context_length": len(context),
+        "status": "ready",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -192,14 +184,12 @@ def run_leader_agent(
 
     if llm:
         print("  🤖 [Researcher Sub-Agent] Calling ChatGroq LLM...")
-        resp = llm.invoke(
-            [
-                SystemMessage(content="You are a senior technical researcher."),
-                HumanMessage(
-                    content=f"Synthesize research for '{user_query}':\nDocs: {raw_docs}\nMetrics: {ext_data}"
-                ),
-            ]
-        )
+        resp = llm.invoke([
+            SystemMessage(content="You are a senior technical researcher."),
+            HumanMessage(
+                content=f"Synthesize research for '{user_query}':\nDocs: {raw_docs}\nMetrics: {ext_data}"
+            ),
+        ])
         research_notes = str(resp.content)
     else:
         print("  💡 [Researcher Sub-Agent] Synthesizing research outputs...")
@@ -229,14 +219,12 @@ def run_leader_agent(
 
     if llm:
         print("  🤖 [Analyst Sub-Agent] Calling ChatGroq LLM...")
-        resp = llm.invoke(
-            [
-                SystemMessage(content="You are a data analyst."),
-                HumanMessage(
-                    content=f"Analyze these research findings and provide strategic implications:\n{research_notes}"
-                ),
-            ]
-        )
+        resp = llm.invoke([
+            SystemMessage(content="You are a data analyst."),
+            HumanMessage(
+                content=f"Analyze these research findings and provide strategic implications:\n{research_notes}"
+            ),
+        ])
         analysis_out = str(resp.content)
     else:
         print("  💡 [Analyst Sub-Agent] Formulating data analysis...")
@@ -263,14 +251,12 @@ def run_leader_agent(
 
     if llm:
         print("  🤖 [Writer Sub-Agent] Calling ChatGroq LLM...")
-        resp = llm.invoke(
-            [
-                SystemMessage(content="You are a professional technical writer."),
-                HumanMessage(
-                    content=f"Compile a final executive summary report based on:\nAnalysis:\n{state.analysis}"
-                ),
-            ]
-        )
+        resp = llm.invoke([
+            SystemMessage(content="You are a professional technical writer."),
+            HumanMessage(
+                content=f"Compile a final executive summary report based on:\nAnalysis:\n{state.analysis}"
+            ),
+        ])
         final_report = str(resp.content)
     else:
         print("  💡 [Writer Sub-Agent] Compiling final executive report...")

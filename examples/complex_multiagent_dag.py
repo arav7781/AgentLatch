@@ -155,16 +155,14 @@ class AuditWorkflowState(TypedDict):
 def fetch_architecture_docs(project: str) -> str:
     """Researcher Sub-Agent tool: Query knowledge base for security standards."""
     time.sleep(0.18)  # Simulate DB lookup
-    return json.dumps(
-        {
-            "status": "success",
-            "docs": [
-                "OWASP Top 10 API Security Risks (2026)",
-                "NIST Cybersecurity Framework v2.0 Guidelines",
-                "AgentLatch Context-Aware Memory Propagation Standard",
-            ],
-        }
-    )
+    return json.dumps({
+        "status": "success",
+        "docs": [
+            "OWASP Top 10 API Security Risks (2026)",
+            "NIST Cybersecurity Framework v2.0 Guidelines",
+            "AgentLatch Context-Aware Memory Propagation Standard",
+        ],
+    })
 
 
 @intent("code_audit")
@@ -180,15 +178,13 @@ def run_static_analysis(code: str, attempt: int) -> str:
             "Critical vulnerability: Unsafe eval() statement detected at line 14!"
         )
 
-    return json.dumps(
-        {
-            "status": "passed",
-            "issues_found": 1 if "eval(" in code else 0,
-            "vulnerabilities": ["Use of eval() in dynamic code evaluation"]
-            if "eval(" in code
-            else [],
-        }
-    )
+    return json.dumps({
+        "status": "passed",
+        "issues_found": 1 if "eval(" in code else 0,
+        "vulnerabilities": ["Use of eval() in dynamic code evaluation"]
+        if "eval(" in code
+        else [],
+    })
 
 
 @intent("security_evaluation")
@@ -206,16 +202,14 @@ def evaluate_security_risk(state: AuditWorkflowState) -> dict[str, Any]:
 
     if llm:
         print("  🤖 [Security Evaluator] Evaluating risk with ChatGroq LLM...")
-        resp = llm.invoke(
-            [
-                SystemMessage(
-                    content="You are a Lead Security Officer. Respond with JSON: {'security_score': float}."
-                ),
-                HumanMessage(
-                    content=f"Code: {state['code_snippet']}\nRemediated: {state.get('remediation_applied')}\nHas Vuln: {has_vuln}"
-                ),
-            ]
-        )
+        resp = llm.invoke([
+            SystemMessage(
+                content="You are a Lead Security Officer. Respond with JSON: {'security_score': float}."
+            ),
+            HumanMessage(
+                content=f"Code: {state['code_snippet']}\nRemediated: {state.get('remediation_applied')}\nHas Vuln: {has_vuln}"
+            ),
+        ])
         content_str = str(resp.content)
         score = 0.96 if state.get("remediation_applied") or not has_vuln else 0.45
         if "0.9" in content_str or "pass" in content_str.lower():
@@ -242,13 +236,11 @@ def apply_remediation(code: str) -> str:
     """Remediation Sub-Agent tool: Auto-fix detected code vulnerabilities."""
     time.sleep(0.2)  # Simulate refactoring pass
     cleaned_code = code.replace("eval(expr)", "ast.literal_eval(expr)")
-    return json.dumps(
-        {
-            "status": "remediated",
-            "original_code": code,
-            "remediated_code": cleaned_code,
-        }
-    )
+    return json.dumps({
+        "status": "remediated",
+        "original_code": code,
+        "remediated_code": cleaned_code,
+    })
 
 
 @intent("report_synthesis")
@@ -261,17 +253,15 @@ def generate_compliance_report(state: AuditWorkflowState) -> str:
     memory = get_memory()
     total_memories = len(memory.query(limit=50)) if memory else 0
 
-    return json.dumps(
-        {
-            "report_title": f"Security & Compliance Audit: {state['project_name']}",
-            "final_score": state.get("security_score", 0.0),
-            "remediation_status": "Applied"
-            if state.get("remediation_applied")
-            else "Clean",
-            "total_dag_memories_referenced": total_memories,
-            "summary": "Project successfully audited and certified under NIST CSF v2.0.",
-        }
-    )
+    return json.dumps({
+        "report_title": f"Security & Compliance Audit: {state['project_name']}",
+        "final_score": state.get("security_score", 0.0),
+        "remediation_status": "Applied"
+        if state.get("remediation_applied")
+        else "Clean",
+        "total_dag_memories_referenced": total_memories,
+        "summary": "Project successfully audited and certified under NIST CSF v2.0.",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -301,12 +291,10 @@ def research_node_fn(state: AuditWorkflowState) -> dict[str, Any]:
 
     if llm:
         print("  🤖 [Research Node] Processing security standards with ChatGroq...")
-        llm.invoke(
-            [
-                SystemMessage(content="Analyze architecture standards."),
-                HumanMessage(content=f"Docs: {data.get('docs', [])}"),
-            ]
-        )
+        llm.invoke([
+            SystemMessage(content="Analyze architecture standards."),
+            HumanMessage(content=f"Docs: {data.get('docs', [])}"),
+        ])
 
     return {"documents": data.get("docs", [])}
 
@@ -326,12 +314,10 @@ def audit_node_fn(state: AuditWorkflowState) -> dict[str, Any]:
 
     if llm:
         print("  🤖 [Audit Node] Validating code audit with ChatGroq...")
-        llm.invoke(
-            [
-                SystemMessage(content="You are a static analysis auditor."),
-                HumanMessage(content=f"Audit Results: {res}"),
-            ]
-        )
+        llm.invoke([
+            SystemMessage(content="You are a static analysis auditor."),
+            HumanMessage(content=f"Audit Results: {res}"),
+        ])
 
     return {"attempt_count": attempt}
 
@@ -345,14 +331,12 @@ def remediation_node_fn(state: AuditWorkflowState) -> dict[str, Any]:
 
     if llm:
         print("  🤖 [Remediation Node] Verifying AST refactor with ChatGroq...")
-        llm.invoke(
-            [
-                SystemMessage(content="Verify code remediation."),
-                HumanMessage(
-                    content=f"Original: {state['code_snippet']}\nRemediated: {new_code}"
-                ),
-            ]
-        )
+        llm.invoke([
+            SystemMessage(content="Verify code remediation."),
+            HumanMessage(
+                content=f"Original: {state['code_snippet']}\nRemediated: {new_code}"
+            ),
+        ])
 
     return {
         "code_snippet": new_code,
@@ -368,14 +352,12 @@ def synthesis_node_fn(state: AuditWorkflowState) -> dict[str, Any]:
         print(
             "  🤖 [Synthesis Node] Generating final compliance report with ChatGroq..."
         )
-        resp = llm.invoke(
-            [
-                SystemMessage(content="You are a Lead Compliance Officer."),
-                HumanMessage(
-                    content=f"Compile final security audit for {state['project_name']} (Score: {state.get('security_score')})."
-                ),
-            ]
-        )
+        resp = llm.invoke([
+            SystemMessage(content="You are a Lead Compliance Officer."),
+            HumanMessage(
+                content=f"Compile final security audit for {state['project_name']} (Score: {state.get('security_score')})."
+            ),
+        ])
         report_text = str(resp.content)
     else:
         report_text = generate_compliance_report(state)

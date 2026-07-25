@@ -162,16 +162,14 @@ class GroqCyclicState(TypedDict):
 def search_vector_db(topic: str) -> str:
     """Search internal knowledge base for architectural specifications."""
     time.sleep(0.15)  # Simulate DB latency
-    return json.dumps(
-        {
-            "topic": topic,
-            "results": [
-                "AgentLatch uses contextvars for trace and memory context propagation.",
-                "Cyclic DAG loops track incremental delta diffs with @context_aware(delta=True).",
-                "ChatGroq provides ultra-fast LLM inference for agentic loops.",
-            ],
-        }
-    )
+    return json.dumps({
+        "topic": topic,
+        "results": [
+            "AgentLatch uses contextvars for trace and memory context propagation.",
+            "Cyclic DAG loops track incremental delta diffs with @context_aware(delta=True).",
+            "ChatGroq provides ultra-fast LLM inference for agentic loops.",
+        ],
+    })
 
 
 @intent("code_validation")
@@ -182,16 +180,14 @@ def validate_code_execution(code: str, iteration: int) -> str:
     time.sleep(0.18)  # Simulate test suite runner
     passed = iteration > 1 or "type_hints" in code.lower()
 
-    return json.dumps(
-        {
-            "iteration": iteration,
-            "tests_passed": passed,
-            "issues": []
-            if passed
-            else ["Missing explicit type annotations and docstring documentation."],
-            "execution_time_ms": 12,
-        }
-    )
+    return json.dumps({
+        "iteration": iteration,
+        "tests_passed": passed,
+        "issues": []
+        if passed
+        else ["Missing explicit type annotations and docstring documentation."],
+        "execution_time_ms": 12,
+    })
 
 
 # ---------------------------------------------------------------------------
