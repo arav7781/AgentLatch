@@ -250,11 +250,13 @@ pipeline = workflow.compile()
 # 4. Traced Execution
 @profile_agent(name="LangGraphAgent")
 def run_langgraph():
-    return pipeline.invoke({
-        "query": "LangGraph + AgentLatch",
-        "documents": [],
-        "analysis": "",
-    })
+    return pipeline.invoke(
+        {
+            "query": "LangGraph + AgentLatch",
+            "documents": [],
+            "analysis": "",
+        }
+    )
 ```
 
 ### Multi-Agent DAG (Leader / Sub-Agent)

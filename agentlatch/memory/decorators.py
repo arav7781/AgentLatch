@@ -330,15 +330,17 @@ def _make_progressive_summary(
 
     # Default progressive summary.
     if isinstance(result, str):
-        return json.dumps({
-            "_agentlatch_ref": True,
-            "tool": tool_name,
-            "type": "string",
-            "length": len(result),
-            "preview": result[:200] if len(result) > 200 else result,
-            "hint": "Full result stored in AgentLatch memory. "
-            "Query with intent or tool_name to retrieve.",
-        })
+        return json.dumps(
+            {
+                "_agentlatch_ref": True,
+                "tool": tool_name,
+                "type": "string",
+                "length": len(result),
+                "preview": result[:200] if len(result) > 200 else result,
+                "hint": "Full result stored in AgentLatch memory. "
+                "Query with intent or tool_name to retrieve.",
+            }
+        )
 
     if isinstance(result, dict):
         return {

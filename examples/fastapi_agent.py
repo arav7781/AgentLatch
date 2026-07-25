@@ -88,12 +88,14 @@ def get_weather(city: str) -> str:
         JSON string with weather data.
     """
     time.sleep(0.08)  # Simulate API latency
-    return json.dumps({
-        "city": city,
-        "temp_c": 22,
-        "condition": "Sunny",
-        "humidity": 65,
-    })
+    return json.dumps(
+        {
+            "city": city,
+            "temp_c": 22,
+            "condition": "Sunny",
+            "humidity": 65,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

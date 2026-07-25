@@ -525,15 +525,17 @@ def flight_specialist_node(
     set_agent_id("flight_agent")
 
     llm = get_groq_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            "You are a Flight Specialist Agent for Swiss Airlines.\n"
-            "Use flight tools to answer queries, check reservations, or search flights.\n"
-            "Passenger ID: {user_info}",
-        ),
-        ("placeholder", "{messages}"),
-    ]).partial(
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a Flight Specialist Agent for Swiss Airlines.\n"
+                "Use flight tools to answer queries, check reservations, or search flights.\n"
+                "Passenger ID: {user_info}",
+            ),
+            ("placeholder", "{messages}"),
+        ]
+    ).partial(
         user_info=config.get("configurable", {}).get("passenger_id", "3442 587242")
     )
 
@@ -656,10 +658,14 @@ def web_researcher_node(state: CustomerSupportState) -> dict[str, Any]:
     search_res = web_search(query=str(last_user_msg))
 
     llm = get_groq_llm()
-    res = llm.invoke([
-        SystemMessage(content="Summarize the web search results accurately."),
-        HumanMessage(content=f"Search Query: {last_user_msg}\nResults: {search_res}"),
-    ])
+    res = llm.invoke(
+        [
+            SystemMessage(content="Summarize the web search results accurately."),
+            HumanMessage(
+                content=f"Search Query: {last_user_msg}\nResults: {search_res}"
+            ),
+        ]
+    )
     return {"messages": [res]}
 
 
