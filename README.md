@@ -2,7 +2,7 @@
 
 **Terminal-native agent resilience middleware for Python.**
 
-AgentLatch is a zero-dependency framework that makes AI agents resilient, observable, and memory-aware. It solves three massive pain points in agent development:
+AgentLatch is a zero-dependency framework that makes agents resilient, observable, and memory-aware. It solves three massive pain points in agent development:
 
 1. **Silent Tool Failures** — When an LLM executes a tool that crashes, AgentLatch intercepts the Python exception, prevents a runtime crash, and feeds a structured JSON error back to the LLM so it can self-correct.
 
