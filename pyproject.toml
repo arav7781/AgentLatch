@@ -7,7 +7,7 @@ name = "agentlatch"
 version = "0.2.2"
 description = "Zero-dependency, terminal-native Python middleware for resilient and observable AI agents."
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "AgentLatch Contributors"}
@@ -16,7 +16,7 @@ keywords = ["agents", "llm", "observability", "middleware", "terminal"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
