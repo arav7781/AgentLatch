@@ -191,3 +191,41 @@ class TestProfileAgent:
 
         result = asyncio.run(async_agent())
         assert result == "async_result"
+
+
+class TestTimeoutDoesNotBlock:
+    """Regression: @safe_tool(timeout=) must bound wall-clock time.
+
+    The executor was previously used as a context manager, whose __exit__
+    joins the worker thread — so the call returned only after the slow tool
+    finished, and the timeout bounded nothing.
+    """
+
+    def test_timeout_returns_before_worker_finishes(self):
+        @safe_tool(timeout=0.2)
+        def slow_tool():
+            time.sleep(3.0)
+            return "too late"
+
+        start = time.monotonic()
+        result = slow_tool()
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 1.5, f"timeout did not bound wall-clock: {elapsed:.2f}s"
+        payload = json.loads(result)
+        assert payload["error_type"] == "TimeoutError"
+
+    def test_fast_tool_still_returns_value(self):
+        @safe_tool(timeout=5.0)
+        def fast_tool():
+            return "on time"
+
+        assert fast_tool() == "on time"
+
+    def test_exception_under_timeout_still_becomes_json(self):
+        @safe_tool(timeout=5.0)
+        def boom():
+            raise ValueError("kaboom")
+
+        payload = json.loads(boom())
+        assert payload["error_type"] == "ValueError"

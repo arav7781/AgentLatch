@@ -80,6 +80,37 @@ def _build_error_payload(exc: Exception, *, safe_mode: bool = True) -> ErrorPayl
     }
 
 
+def _run_with_timeout(
+    fn: Callable[..., Any],
+    timeout: float,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> Any:
+    """Run *fn* on a worker thread, returning no later than *timeout*.
+
+    The executor is shut down with ``wait=False`` rather than being used as a
+    context manager.  ``ThreadPoolExecutor.__exit__`` calls
+    ``shutdown(wait=True)``, which joins the worker — so a ``with`` block would
+    block until the slow call finished and the timeout would bound nothing.
+
+    The tradeoff is explicit: Python cannot kill a running thread, so on
+    timeout the worker is *abandoned*, not stopped.  It keeps consuming CPU
+    and may still write to shared state after this function returns.  That is
+    the price of a timeout that actually fires; for enforced termination use
+    ``agentlatch.harness.sandbox.DockerSandbox``.
+
+    Raises:
+        concurrent.futures.TimeoutError: If *fn* outlives the budget.
+    """
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(fn, *args, **kwargs)
+        return future.result(timeout=timeout)
+    finally:
+        # Never joins: a timed-out worker must not delay the caller.
+        pool.shutdown(wait=False)
+
+
 def _build_timeout_payload(name: str, timeout: float) -> ErrorPayload:
     """Payload returned when a tool exceeds its allowed time budget."""
     return {
@@ -182,15 +213,7 @@ def safe_tool(
 
                 try:
                     if timeout is not None:
-                        with concurrent.futures.ThreadPoolExecutor(
-                            max_workers=1
-                        ) as pool:
-                            future = pool.submit(fn, *args, **kwargs)
-                            try:
-                                result = future.result(timeout=timeout)
-                            except concurrent.futures.TimeoutError:
-                                future.cancel()
-                                raise
+                        result = _run_with_timeout(fn, timeout, args, kwargs)
                     else:
                         result = fn(*args, **kwargs)
                 except concurrent.futures.TimeoutError:

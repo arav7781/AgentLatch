@@ -127,3 +127,53 @@ class TestCombined:
         assert "truncated" in result or len(result) <= 400
         # The rows should have been sampled first
         # Then the serialized result truncated if still too long
+
+
+class TestStructuredBudget:
+    """Non-string payloads must respect max_tokens too.
+
+    Regression: sample_response previously ignored max_tokens on the
+    dict/list path, so @safe_tool(max_response_tokens=N) did not bound a
+    tool that returned structured data.
+    """
+
+    def test_oversized_dict_is_bounded(self):
+        data = {"rows": [{"id": i, "blob": "x" * 200} for i in range(1000)]}
+        result = sample_response(data, max_tokens=200)
+        assert len(json.dumps(result, default=str)) <= 200 * 4
+
+    def test_oversized_dict_stays_structured(self):
+        """Structure is the last thing to go — never stringify a dict."""
+        data = {"rows": [{"id": i, "blob": "x" * 200} for i in range(1000)]}
+        result = sample_response(data, max_tokens=200)
+        assert isinstance(result, dict)
+
+    def test_oversized_list_is_bounded(self):
+        data = [{"id": i, "blob": "y" * 100} for i in range(2000)]
+        result = sample_response(data, max_tokens=150)
+        assert len(json.dumps(result, default=str)) <= 150 * 4
+
+    def test_nested_list_under_unknown_key_is_sampled(self):
+        """_walk_and_sample only sees top-level known keys; the fit pass
+        must reach deeper."""
+        data = {"outer": {"weird_key": [{"n": i} for i in range(5000)]}}
+        result = sample_response(data, max_tokens=100)
+        assert len(json.dumps(result, default=str)) <= 100 * 4
+
+    def test_small_dict_untouched_with_max_tokens(self):
+        data = {"name": "Alice", "age": 30}
+        assert sample_response(data, max_tokens=1000) == data
+
+    def test_no_max_tokens_leaves_oversized_dict_alone(self):
+        """Opting out must still opt out."""
+        data = {"rows": [{"id": i} for i in range(100)]}
+        result = sample_response(data, sample_rows=None)
+        assert result == data
+
+    def test_unserializable_payload_does_not_raise(self):
+        class Weird:
+            def __repr__(self):
+                return "W" * 5000
+
+        result = sample_response({"obj": Weird()}, max_tokens=50)
+        assert result is not None
