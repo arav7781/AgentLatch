@@ -10,6 +10,8 @@ AgentLatch is a zero-dependency framework that makes agents resilient, observabl
 
 3. **Context Rot in Multi-Agent Workflows** — In long-running DAG pipelines, LLMs forget key information and repeat mistakes. `@context_aware` creates structured memory snapshots with delta updates, progressive disclosure, and intent tagging so sub-agents can query upstream results without re-executing.
 
+4. **No Execution Boundary** — Orchestration frameworks (LangGraph, CrewAI, AutoGen) decide what an agent does next, but none of them decide what it is *allowed* to do or where its code actually runs. The **AgentLatch Harness** (`agentlatch.harness`) adds a permission-gated, sandboxed execution layer around any framework in one line: `harness.wrap(LangGraphAdapter(my_graph))`.
+
 ## Quick Install
 
 To install the core package:
@@ -29,6 +31,12 @@ pip install "agentlatch[qdrant]"     # Qdrant
 pip install "agentlatch[graph]"      # Neo4j
 pip install "agentlatch[all-memory]" # All backends
 ```
+
+To install with **Harness sandboxed code execution** (Docker):
+```bash
+pip install "agentlatch[sandbox]"    # adds docker>=6.0 for DockerSandbox
+```
+`ThreadSandbox` needs nothing extra — only `DockerSandbox` requires this extra, and the harness core (permissions, adapters, compaction) has no dependency beyond `rich` either way.
 
 ## Setup Virtual Environment
 
@@ -54,6 +62,9 @@ AgentLatch is built to address critical requirements of production-ready AI agen
 * **Execution Timeline and Flamegraphs**: Track down slow operations (e.g. database lookups, external APIs). `@profile_agent` creates a visual breakdown of your tool durations vs. LLM reasoning directly in the CLI.
 * **HTTP Endpoint Observability**: Debug agent execution flows during integration testing. `AgentLatchMiddleware` injects detailed trace logs directly into your Starlette/FastAPI headers and JSON response bodies for Postman or cURL debugging.
 * **Structured Memory for Multi-Agent DAGs**: `@context_aware` creates memory snapshots after tool calls with intent tagging, delta updates, and progressive disclosure. Sub-agents in a DAG can query upstream results without re-executing expensive operations.
+* **Tiered Tool Permissions**: `Harness` classifies every tool call into Tier 1 (auto-approved, read-only), Tier 2 (human-in-the-loop, state-changing), or Tier 3 (permanently blocked, destructive). Unrecognized tools default to asking a human, never to running silently.
+* **Sandboxed Code Execution**: Agent-authored Python or shell code never runs on the host. `ThreadSandbox` gives timeout containment for trusted code; `DockerSandbox` runs it in an ephemeral, network-isolated container with a read-only root filesystem.
+* **Progressive Tool Disclosure**: `ToolRegistry` loads only tool name + one-line summary into the system prompt, and exposes a `get_tool_schema` tool the agent calls to fetch a full schema on demand — cutting prompt tokens for large tool catalogs.
 
 ## Usage
 
@@ -118,6 +129,133 @@ app.add_middleware(
 )
 ```
 
+### 4. The Harness — Universal Execution Layer
+
+The harness sits between your agent framework and the operating system. Every tool call flows through one pipeline regardless of what produced it:
+
+```
+ToolCall -> PermissionGate -> [Sandbox] -> Compactor -> ToolResult
+```
+
+Nothing in this pipeline raises outward — a blocked call, a denied approval, a crashed tool, and a timed-out container all come back as structured data the LLM can read and correct from, same as `@safe_tool`.
+
+```python
+from agentlatch.harness import Harness, ThreadSandbox, cli_approval_callback
+from agentlatch.harness.adapters import CallableAdapter
+
+
+def read_config(path: str) -> str:
+    """Tier 1 — read-only, auto-approved by the default policy."""
+    return f"contents of {path}"
+
+
+def delete_user(user_id: int) -> str:
+    """Tier 2 — mutates state, so a human is asked before it runs."""
+    return f"deleted user {user_id}"
+
+
+harness = Harness(
+    sandbox=ThreadSandbox(),  # or DockerSandbox() for real isolation
+    on_approval=cli_approval_callback,  # prompts on stdin for Tier 2 calls
+)
+
+tools = harness.wrap(
+    CallableAdapter(
+        {
+            "read_config": read_config,
+            "delete_user": delete_user,
+        }
+    )
+)
+
+tools["read_config"]("/etc/app.conf")  # runs immediately
+tools["delete_user"](user_id=42)  # pauses for approval first
+
+# Sandbox agent-authored code directly — never on the host:
+result = harness.execute_code("print(sum(range(10)))")
+print(result.stdout)  # "45"
+
+print(harness.audit_log)  # every decision, structured
+```
+
+One-liner for the common case — auto-detects the framework from the object's shape:
+
+```python
+from agentlatch.harness import secure
+
+secured_graph, harness = secure(my_compiled_langgraph, sandbox=ThreadSandbox())
+secured_graph.invoke({"messages": [...]})
+```
+
+**Adapters** attach the harness to a framework without the harness knowing anything about it:
+
+```python
+from agentlatch.harness.adapters import LangGraphAdapter, CrewAIAdapter
+
+secured_graph = harness.wrap(
+    LangGraphAdapter(my_compiled_graph)
+)  # still .invoke()-able
+secured_crew = harness.wrap(CrewAIAdapter(my_crew))  # still .kickoff()-able
+```
+
+**Permission policy** is fully customizable — rules match by tool-name glob or by regex against the flattened call, and the most restrictive match always wins:
+
+```python
+from agentlatch.harness import PermissionPolicy, Rule, PermissionTier
+
+policy = (
+    PermissionPolicy.default()
+)  # Tier 1 read_*/get_*/list_*, Tier 2 write_*/delete_*, Tier 3 rm -rf etc.
+policy.add_rule(
+    Rule(
+        name="block_prod_migrations",
+        tools=["run_migration"],
+        tier=PermissionTier.BLOCKED,
+        reason="Production migrations must go through the release pipeline, not an agent.",
+    )
+)
+
+harness = Harness(policy=policy)
+```
+
+**Sandboxed code execution** — `DockerSandbox` runs agent-authored code in an ephemeral container: no network by default, dropped capabilities, read-only root filesystem, and only the environment variables you explicitly pass through (the host's environment, including its API keys, is never inherited):
+
+```python
+from agentlatch.harness import DockerSandbox, ExecutionRequest, Language
+
+with (
+    DockerSandbox() as box
+):  # auto-discovers Docker Desktop, colima, or Rancher's socket
+    result = box.run(
+        ExecutionRequest(
+            code="print('hello from an isolated container')",
+            language=Language.PYTHON,
+            timeout=10.0,
+        )
+    )
+    print(result.stdout, result.exit_code)
+```
+
+**Context compaction and progressive disclosure** keep large tool catalogs and large tool outputs from blowing up the context window:
+
+```python
+from agentlatch.harness import Compactor, ToolRegistry
+
+compactor = Compactor(max_tokens=2048, sample_rows=50)
+result = compactor.compact(huge_dict_from_a_database_tool)
+print(result.compacted, result.final_tokens)
+
+registry = harness.registry  # auto-populated by harness.wrap() from adapter.discover()
+print(registry.system_prompt_block())  # names + one-line summaries only
+schema = registry.disclose("read_config")  # full schema, fetched on demand
+```
+
+Run the end-to-end demo (no agent framework required):
+```bash
+python examples/harness_agent.py            # ThreadSandbox
+python examples/harness_agent.py --docker    # real container isolation
+```
+
 ## What Happens
 
 1. **Execution**: Every `@safe_tool` call is timed, protected, and sampled.
@@ -175,6 +313,11 @@ app.add_middleware(
 | Async support | All decorators work with `async def` functions |
 | Dev Mode Guard | Automatically suppresses ASCII visuals in production (`AGENTLATCH_ENV=production`) |
 | Framework agnostic | Works with LangGraph, AutoGen, CrewAI, or vanilla scripts |
+| `Harness` | Universal execution layer: permission gate, sandbox, and compaction around any framework |
+| `PermissionPolicy` / `PermissionGate` | Tiered auto-approve / human-in-the-loop / block-outright rules for tool calls |
+| `ThreadSandbox` / `DockerSandbox` | Run agent-authored code off the host — thread-timeout or ephemeral network-isolated container |
+| `ToolRegistry` | Progressive tool disclosure — summaries in the prompt, full schemas fetched on demand |
+| `LangGraphAdapter` / `CrewAIAdapter` / `CallableAdapter` | Attach the harness to a framework in one line, no framework-specific code required |
 
 ## Memory System
 
@@ -340,6 +483,10 @@ python examples/groq_customer_support_bot.py
 # FastAPI + LangGraph + Groq Agent (requires GROQ_API_KEY)
 export GROQ_API_KEY="your-groq-key"
 uvicorn examples.fastapi_agent:app --reload
+
+# Harness — permissions, sandboxing, and compaction, no framework required
+python examples/harness_agent.py
+python examples/harness_agent.py --docker  # requires `pip install agentlatch[sandbox]` + a running daemon
 ```
 
 ## Running Tests
@@ -388,11 +535,49 @@ graph TD
     end
 ```
 
+### Harness Architecture
+
+The harness is a second, independent layer built on the same foundations — it governs tool calls owned by an *agent framework*, where the decorators above protect tools *you* write.
+
+```mermaid
+graph TD
+    subgraph Adapters
+        LG[LangGraphAdapter] --> WRAP[Harness.wrap]
+        CA[CrewAIAdapter] --> WRAP
+        GA[CallableAdapter] --> WRAP
+    end
+
+    WRAP -->|every tool call| TC[ToolCall]
+    TC --> PG{PermissionGate}
+    PG -->|Tier 1: auto| EXEC[Execute]
+    PG -->|Tier 2: human| APPROVE[on_approval callback]
+    PG -->|Tier 3: blocked| DENY[Refused — never executes]
+    APPROVE -->|approved| EXEC
+    APPROVE -->|denied/timeout/no callback| DENY
+
+    EXEC -->|code tool| SBOX{Sandbox configured?}
+    SBOX -->|ThreadSandbox| THR[Isolated thread + timeout]
+    SBOX -->|DockerSandbox| DKR[Ephemeral container, no network, read-only root]
+    SBOX -->|none| REFUSE[Refused — never runs on host]
+
+    EXEC -->|regular tool| RESULT[Raw result]
+    THR --> RESULT
+    DKR --> RESULT
+
+    RESULT --> COMPACT[Compactor]
+    COMPACT -->|fits sample_response budget| OK[ToolResult]
+    DENY --> ERR[Structured error payload]
+    REFUSE --> ERR
+    ERR --> OK
+    OK --> LLM[Back to the agent]
+```
+
 - **`contextvars`** — Thread-safe trace and memory propagation without manual IDs
 - **`concurrent.futures`** — Cross-platform timeouts (no `signal.alarm`)
 - **`sqlite3`** — Zero-dependency default memory backend
 - **`rich`** — Premium terminal rendering
 - **`starlette`** — Lightweight core HTTP middleware support
+- **`docker`** *(optional, `[sandbox]` extra)* — Ephemeral, network-isolated code execution via `DockerSandbox`
 
 ## License
 
