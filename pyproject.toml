@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentlatch"
-version = "0.2.1"
+version = "0.2.2"
 description = "Zero-dependency, terminal-native Python middleware for resilient and observable AI agents."
 readme = "README.md"
 license = {text = "MIT"}
@@ -52,6 +52,9 @@ qdrant = [
 ]
 graph = [
     "neo4j>=5.0",
+]
+sandbox = [
+    "docker>=6.0",
 ]
 all-memory = [
     "agentlatch[vector]",

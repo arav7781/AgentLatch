@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 from typing import Any, TypeAlias, TypedDict
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 # ---------------------------------------------------------------------------
 # Enums
