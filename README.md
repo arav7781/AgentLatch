@@ -580,5 +580,4 @@ graph TD
 - **`docker`** *(optional, `[sandbox]` extra)* — Ephemeral, network-isolated code execution via `DockerSandbox`
 
 ## License
-
 Apache 2.0
